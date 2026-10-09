@@ -5,7 +5,7 @@
 // day and what's coming up, a small month, the tasks of a day, and the agenda
 
 import * as React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -285,6 +285,8 @@ export function TasksDue(props: { tasks: TaskType[], fmt: DateFormats, onToggle:
 // The next four weeks, day by day (the days with nothing on are left out)
 export function Agenda(props: { from: Date, occurrences: Occurrence[], fmt: DateFormats, showRepeating: boolean, onEventPress: (x: Occurrence) => void }) {
   const theme = useTheme();
+  // On phones the time is above the event, rather than in a column of its own
+  const narrow = useWindowDimensions().width < 700;
   const { fmt } = props;
   const now = new Date();
   const until = addDays(props.from, 28);
@@ -299,13 +301,13 @@ export function Agenda(props: { from: Date, occurrences: Occurrence[], fmt: Date
     }
   }
   return (
-    <View style={styles.agenda} testID="agenda">
+    <View style={[styles.agenda, (narrow) ? { paddingHorizontal: 16 } : undefined]} testID="agenda">
       {days.map(({ day, events }, idx) => {
         const offset = Math.round((day.getTime() - startOfDay(now).getTime()) / (24 * 3600 * 1000));
         const tag = (offset === 0) ? "Today" : (offset === 1) ? "Tomorrow" : "";
         return (
-          <View key={day.getTime()} style={[styles.agendaDay, (idx > 0) ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border } : undefined]}>
-            <View style={{ width: 84 }}>
+          <View key={day.getTime()} style={[styles.agendaDay, (narrow) ? { gap: 12 } : undefined, (idx > 0) ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border } : undefined]}>
+            <View style={{ width: (narrow) ? 68 : 84 }}>
               {(offset === 0) ? (
                 <View style={[styles.agendaToday, { backgroundColor: theme.colors.accent }]}>
                   <Text style={{ fontSize: 18, fontFamily: fonts.bold, color: theme.colors.onAccent }}>{day.getDate()}</Text>
@@ -329,13 +331,16 @@ export function Agenda(props: { from: Date, occurrences: Occurrence[], fmt: Date
                     onPress={() => props.onEventPress(x)}
                     style={[styles.agendaEvent, (isNext) ? { backgroundColor: theme.colors.accentTint } : undefined]}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14 }}>
-                      <Text style={[styles.mono, { width: 116, fontSize: 12, paddingTop: 2, color: theme.colors.textSecondary }]}>
+                    <View style={{ flexDirection: (narrow) ? "column" : "row", alignItems: "flex-start", gap: (narrow) ? 2 : 14 }}>
+                      <Text style={[styles.mono, { width: (narrow) ? undefined : 116, fontSize: 12, paddingTop: 2, color: theme.colors.textSecondary }]}>
                         {(x.allDay) ? ((span > 1) ? `Day ${dayOf} of ${span}` : "All day") : `${fmt.time(x.start)} – ${fmt.time(x.end)}`}
                       </Text>
-                      <View style={[styles.agendaDot, { backgroundColor: x.color }]} />
-                      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                        <Text style={{ fontFamily: fonts.semibold, fontSize: 15, color: theme.colors.text }}>{x.title}</Text>
+                      {!narrow && <View style={[styles.agendaDot, { backgroundColor: x.color }]} />}
+                      <View style={{ flex: (narrow) ? undefined : 1, minWidth: 0, gap: 3, alignSelf: "stretch" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          {narrow && <View style={[styles.agendaDot, { backgroundColor: x.color, marginTop: 0 }]} />}
+                          <Text style={{ flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: theme.colors.text }}>{x.title}</Text>
+                        </View>
                         {(!!x.location || (x.attendees.length > 0)) && (
                           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
                             {!!x.location && <Place location={x.location} />}

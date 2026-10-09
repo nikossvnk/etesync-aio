@@ -89,7 +89,7 @@ run(async () => {
   await addItem(etebase, byType(types.calendar), [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//e2e", "BEGIN:VEVENT", `UID:standup-${n}`,
     `DTSTART:${icalDate(today)}T100000`, `DTEND:${icalDate(today)}T103000`, `SUMMARY:Standup ${n}`,
-    "RRULE:FREQ=WEEKLY", "END:VEVENT", "END:VCALENDAR", "",
+    `RRULE:FREQ=WEEKLY;BYDAY=${["SU", "MO", "TU", "WE", "TH", "FR", "SA"][today.getDay()]}`, "END:VEVENT", "END:VCALENDAR", "",
   ].join("\r\n"));
   await addItem(etebase, byType(types.tasks), [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//e2e", "BEGIN:VTODO", `UID:milk-${n}`,
@@ -152,6 +152,22 @@ run(async () => {
     const all = s.filter((x) => x.type === types.calendar).flatMap((x) => x.contents);
     return all.some((c) => c.includes(`SUMMARY:Dentist (moved) ${n}`)) && !all.some((c) => c.includes(`SUMMARY:Dentist ${n}`));
   }));
+
+  // An event that repeats every week
+  await btn(/^new event$/i).click(); await wait(2000);
+  await vis('input[aria-label="Title"]').fill(`Yoga ${n}`);
+  await vis('input[aria-label="Start time"]').fill("18:00");
+  await vis('input[aria-label="End time"]').fill("19:00");
+  await btn(/^repeat weekly$/i).click(); await wait(300);
+  await btn(/^save$/i).click(); await wait(3000);
+  check("an event can be made to repeat weekly", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
+    x.contents.some((c) => c.includes(`SUMMARY:Yoga ${n}`) && c.includes("RRULE:FREQ=WEEKLY")))), serverDetail(types.calendar)());
+  // The standup repeats with a rule the editor can't make, which is kept when it's changed
+  await p.getByRole("button", { name: `Event Standup ${n}` }).locator("visible=true").first().click(); await wait(2000);
+  check("a rule the editor can't make shows as custom", (await btn(/^repeat custom$/i).getAttribute("aria-selected")) === "true");
+  await btn(/^save$/i).click(); await wait(2500);
+  check("and is kept when the event is saved", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
+    x.contents.some((c) => c.includes(`SUMMARY:Standup ${n}`) && c.includes("RRULE:FREQ=WEEKLY;BYDAY=")))), serverDetail(types.calendar)());
 
   // The week and the day views
   const grid = p.locator('[data-testid="time-grid"] >> visible=true');
@@ -269,9 +285,10 @@ run(async () => {
   await details.getByRole("button", { name: "Edit task" }).click(); await wait(2000);
   const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3);
   await vis('input[aria-label="Due date"]').fill(isoDate(due));
+  await btn(/^repeat weekly$/i).click(); await wait(300);
   await btn(/^save$/i).click(); await wait(2500);
   check("a due date set in the editor is on the server", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.tasks) &&
-    x.contents.some((c) => c.includes(`SUMMARY:Call mom ${n}`) && c.includes(`DUE;VALUE=DATE:${icalDate(due)}`)))));
+    x.contents.some((c) => c.includes(`SUMMARY:Call mom ${n}`) && c.includes(`DUE;VALUE=DATE:${icalDate(due)}`) && c.includes("RRULE:FREQ=WEEKLY")))));
 
   // The contacts
   await sideRow("Contacts").click(); await wait(3000);
@@ -340,6 +357,10 @@ run(async () => {
   await B.tab("Contacts"); await B.wait(2000);
   await B.p.getByRole("button", { name: `Contact Grace ${n} Hopper` }).click(); await B.wait(2000);
   check("and a contact opens on its own screen", await B.has("US Navy") && await B.has("+1 555 0100"), await B.text());
+  await B.back();
+  await B.tab("Search all"); await B.wait(2000);
+  await B.vis('input[aria-label="Search everything"]').fill(`${n}`); await B.wait(3000);
+  check("on a phone, the search of everything has its own field", (await B.text()).includes(`Grace ${n} Hopper`) && (await B.text()).includes(`Call mom ${n}`), await B.text());
   await B.ctx.close();
 
   await b.close();

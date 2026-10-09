@@ -24,7 +24,7 @@ import { TaskStatusType, TaskType } from "./pim-types";
 import { priorityName } from "./TasksScreen";
 import { useTheme } from "../theme";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
-import { AccentButton, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, toDateString } from "./widgets";
+import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString } from "./widgets";
 
 interface PropsType {
   route: RouteProp<RootStackParamList, "TaskEdit">;
@@ -48,6 +48,7 @@ export default function TaskEditScreen(props: PropsType) {
   const [done, setDone] = React.useState(false);
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState("None");
+  const [repeat, setRepeat] = React.useState<RepeatKey>("none");
   const [error, setError] = React.useState<string>();
   const [deleteShown, setDeleteShown] = React.useState(false);
 
@@ -62,6 +63,7 @@ export default function TaskEditScreen(props: PropsType) {
       setDone(existing.finished);
       setDescription(existing.description ?? "");
       setPriority(priorityName(existing));
+      setRepeat(repeatKeyOf(existing.isRecurring() ? existing.rrule : null));
     } else {
       setList(colUid ?? lists[0]?.colUid);
     }
@@ -132,6 +134,11 @@ export default function TaskEditScreen(props: PropsType) {
       task.status = (done) ? TaskStatusType.Completed : TaskStatusType.NeedsAction;
       task.completionDate = (done) ? ICAL.Time.now() : undefined;
     }
+    if ((repeat !== "none") && (repeat !== "custom") && !dueDate) {
+      setError("A task that repeats needs a due date");
+      return;
+    }
+    applyRepeat(task.component, repeat);
     task.lastModified = ICAL.Time.now();
 
     try {
@@ -164,6 +171,9 @@ export default function TaskEditScreen(props: PropsType) {
             <DateTimeInput mode="date" value={due} onChange={setDue} accessibilityLabel="Due date" />
             {!!due && <Text onPress={() => setDue("")} style={{ textDecorationLine: "underline" }}>Clear</Text>}
           </View>
+        </Field>
+        <Field label="Repeat">
+          <RepeatPicker value={repeat} onChange={setRepeat} />
         </Field>
         <Field label="Priority">
           <View style={{ flexDirection: "row", gap: 6 }}>

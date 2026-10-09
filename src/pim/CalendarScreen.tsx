@@ -359,7 +359,14 @@ export default function CalendarScreen() {
                       ) : (
                         <Text style={[styles.dayNumber, { color: (inMonth) ? theme.colors.textSecondary : theme.colors.disabled }]}>{day.getDate()}</Text>
                       )}
-                      {dayEvents.slice(0, max).map((x) => {
+                      {(!wide) && (
+                        <View style={styles.dots}>
+                          {dayEvents.slice(0, 5).map((x) => (
+                            <View key={x.key} style={[styles.eventDot, { backgroundColor: x.color, opacity: (inMonth) ? 1 : 0.55 }]} />
+                          ))}
+                        </View>
+                      )}
+                      {(wide) && dayEvents.slice(0, max).map((x) => {
                         if (x.allDay) {
                           // Events of several days join from one day to the next
                           const first = sameDay(x.start, day);
@@ -381,7 +388,7 @@ export default function CalendarScreen() {
                           </View>
                         );
                       })}
-                      {(dayEvents.length > max) && (
+                      {(wide) && (dayEvents.length > max) && (
                         <Text style={{ fontSize: 12, color: theme.colors.textMuted, paddingLeft: 4 }}>+{dayEvents.length - max} more</Text>
                       )}
                     </View>
@@ -496,6 +503,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 4,
+  },
+  dots: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    paddingLeft: 4,
   },
   eventDot: {
     width: 6,

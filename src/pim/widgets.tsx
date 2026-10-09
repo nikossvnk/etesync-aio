@@ -7,6 +7,7 @@ import * as React from "react";
 import { Platform, StyleSheet, TextInput as NativeTextInput, View, ViewStyle, StyleProp } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ICAL from "ical.js";
 
 import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
@@ -282,3 +283,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
+// How often something repeats. "custom" is a rule this app can't make (e.g. on some days of the
+// week), which is kept as it is unless another one is chosen.
+export type RepeatKey = "none" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "custom";
+export const repeatNames: { [key in RepeatKey]: string } = {
+  none: "Never",
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  YEARLY: "Yearly",
+  custom: "Custom",
+};
+
+export function repeatKeyOf(rule: any): RepeatKey {
+  if (!rule) {
+    return "none";
+  }
+  const json = rule.toJSON?.() ?? {};
+  const simple = Object.keys(json).every((x) => ["freq", "interval", "wkst"].includes(x)) && ((json.interval ?? 1) === 1);
+  return (simple && (json.freq in repeatNames)) ? json.freq : "custom";
+}
+
+export function RepeatPicker(props: { value: RepeatKey, onChange: (value: RepeatKey) => void }) {
+  const theme = useTheme();
+  const options = (["none", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as RepeatKey[]).concat((props.value === "custom") ? ["custom"] : []);
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+      {options.map((x) => {
+        const selected = props.value === x;
+        return (
+          <TouchableRipple
+            key={x}
+            accessibilityRole="button"
+            accessibilityLabel={`Repeat ${repeatNames[x]}`}
+            accessibilityState={{ selected }}
+            aria-selected={selected}
+            onPress={() => props.onChange(x)}
+            style={[styles.chip, { borderColor: (selected) ? theme.colors.chipActive : theme.colors.border, backgroundColor: (selected) ? theme.colors.chipActive : theme.colors.surface }]}
+          >
+            <Text style={{ fontSize: 13, color: (selected) ? theme.colors.onChipActive : theme.colors.textBody }}>{repeatNames[x]}</Text>
+          </TouchableRipple>
+        );
+      })}
+    </View>
+  );
+}
+
+// Sets how often an event or a task repeats ("custom" keeps the rule it has)
+export function applyRepeat(comp: ICAL.Component, repeat: RepeatKey) {
+  if (repeat === "custom") {
+    return;
+  } else if (repeat === "none") {
+    comp.removeAllProperties("rrule");
+  } else if (repeatKeyOf(comp.getFirstPropertyValue("rrule")) !== repeat) {
+    comp.updatePropertyWithValue("rrule", new ICAL.Recur({ freq: repeat } as any));
+  }
+}

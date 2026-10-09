@@ -250,6 +250,8 @@ export default function TimeGrid(props: PropsType) {
   const [width, setWidth] = React.useState(0);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const columnWidth = (width - gutterWidth) / days.length;
+  // On phones the columns of a week are too narrow for the day's name next to its number
+  const compact = (width > 0) && (columnWidth < 90);
 
   // Starting in the morning rather than at midnight (a bit above 7:00, so that its label is shown whole)
   React.useEffect(() => {
@@ -289,16 +291,18 @@ export default function TimeGrid(props: PropsType) {
               accessibilityLabel={fmt.day.format(day)}
               disabled={!props.onDayPress}
               onPress={() => props.onDayPress?.(day)}
-              style={[styles.column, styles.dayHeader]}
+              style={[styles.column, styles.dayHeader, (compact) ? { paddingHorizontal: 0 } : undefined]}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-                <Text style={[styles.weekDay, { color: theme.colors.textMuted }]}>{fmt.weekDay.format(day)}</Text>
+              <View style={{ flexDirection: (compact) ? "column" : "row", alignItems: "center", gap: (compact) ? 2 : 7 }}>
+                <Text style={[styles.weekDay, { color: theme.colors.textMuted }, (compact) ? { fontSize: 10, letterSpacing: 0 } : undefined]}>
+                  {(compact) ? fmt.weekDay.format(day).slice(0, 2) : fmt.weekDay.format(day)}
+                </Text>
                 {(isToday) ? (
                   <View style={[styles.today, { backgroundColor: theme.colors.accent }]}>
                     <Text style={{ fontSize: 14, fontFamily: fonts.bold, color: theme.colors.onAccent }}>{day.getDate()}</Text>
                   </View>
                 ) : (
-                  <Text style={{ fontSize: 18, fontFamily: fonts.semibold, color: theme.colors.text }}>{day.getDate()}</Text>
+                  <Text style={{ fontSize: (compact) ? 15 : 18, fontFamily: fonts.semibold, color: theme.colors.text }}>{day.getDate()}</Text>
                 )}
               </View>
             </TouchableRipple>

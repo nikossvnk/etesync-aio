@@ -24,7 +24,7 @@ import * as C from "../constants";
 import { EventType, timezoneLoadFromName } from "./pim-types";
 import { eventAttendees } from "./occurrences";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
-import { AccentButton, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, toDateString, toTimeString } from "./widgets";
+import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString, toTimeString } from "./widgets";
 
 interface PropsType {
   route: RouteProp<RootStackParamList, "EventEdit">;
@@ -56,6 +56,7 @@ export default function EventEditScreen(props: PropsType) {
   const [endDate, setEndDate] = React.useState(date ?? toDateString(new Date()));
   const [endTime, setEndTime] = React.useState(`${String(Math.min(startHour + 1, 23)).padStart(2, "0")}:${(startHour === 23) ? "59" : "00"}`);
   const [location, setLocation] = React.useState("");
+  const [repeat, setRepeat] = React.useState<RepeatKey>("none");
   const [description, setDescription] = React.useState("");
   const [error, setError] = React.useState<string>();
   const [deleteShown, setDeleteShown] = React.useState(false);
@@ -81,6 +82,7 @@ export default function EventEditScreen(props: PropsType) {
       setEndDate(toDateString(end));
       setEndTime(toTimeString(end));
       setLocation(existing.location ?? "");
+      setRepeat(repeatKeyOf(existing.isRecurring() ? existing.rrule : null));
       setDescription(existing.description ?? "");
     } else {
       setCalendar(colUid ?? calendars[0]?.colUid);
@@ -152,6 +154,7 @@ export default function EventEditScreen(props: PropsType) {
     event.endDate = icalEnd;
     event.location = location;
     event.description = description;
+    applyRepeat(event.component, repeat);
     event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
     // Scheduled from a contact: they're invited
     if (!existing && attendeeName) {
@@ -209,9 +212,12 @@ export default function EventEditScreen(props: PropsType) {
             <DateTimeInput mode="time" value={endTime} onChange={setEndTime} accessibilityLabel="End time" disabled={allDay} />
           </Field>
         </View>
+        <Field label="Repeat">
+          <RepeatPicker value={repeat} onChange={setRepeat} />
+        </Field>
         {existing?.isRecurring() && (
           <Text style={{ color: theme.colors.textMuted, marginBottom: 14 }}>
-            This event repeats ({existing.rrule.toString()}). Changing it changes all of its times.
+            Changes to a repeating event change all of its times.
           </Text>
         )}
         {(existing ? eventAttendees(existing).map((x) => x.name) : (attendeeName) ? [attendeeName] : []).length > 0 && (

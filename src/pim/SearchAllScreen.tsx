@@ -3,14 +3,14 @@
 
 // What the search of the sidebar finds: notes, events, tasks and contacts
 
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 
 import { useCredentials } from "../credentials";
-import { useSearchQuery } from "../components/WideLayout";
+import { useSearchQuery, useSidebarShown } from "../components/WideLayout";
 import { useNoteSearch } from "../search";
 import { StoreState } from "../store";
 import { fonts, useTheme } from "../theme";
@@ -41,7 +41,9 @@ export default function SearchAllScreen() {
   const theme = useTheme();
   const navigation = useNavigation<any>();
   const etebase = useCredentials();
-  const { query } = useSearchQuery();
+  const { query, setQuery } = useSearchQuery();
+  // Without the sidebar (on phones), the search has its own field here
+  const sidebarShown = useSidebarShown();
   const fmt = useDateFormats();
   const cacheCollections = useSelector((state: StoreState) => state.cache.collections);
   const notes = useNoteSearch(query, true);
@@ -112,10 +114,26 @@ export default function SearchAllScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      {(!sidebarShown) && (
+        <View style={[styles.field, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.textMuted} />
+          <TextInput
+            autoFocus
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Notes, events, tasks and contacts"
+            placeholderTextColor={theme.colors.textMuted}
+            accessibilityLabel="Search everything"
+            style={[styles.input, { color: theme.colors.text }]}
+          />
+        </View>
+      )}
       <Text style={[styles.heading, { color: theme.colors.text }]} accessibilityRole="header">
         {(q) ? `Results for “${q}”` : "Search"}
       </Text>
-      {(!q) && <Text style={{ color: theme.colors.textMuted }}>Type in the search of the sidebar to find notes, events, tasks and contacts.</Text>}
+      {(!q) && <Text style={{ color: theme.colors.textMuted }}>
+        {(sidebarShown) ? "Type in the search of the sidebar to find notes, events, tasks and contacts." : "Type above to find notes, events, tasks and contacts."}
+      </Text>}
       {(q && found.length === 0) && <Text style={{ color: theme.colors.textMuted }}>Nothing found.</Text>}
       {found.map((group) => (
         <View key={group.title} style={styles.group} testID={`results-${group.title}`}>
@@ -160,6 +178,22 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 6,
   },
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingLeft: 12,
+    marginBottom: 12,
+  },
+  input: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    outlineStyle: "none",
+  } as any,
   heading: {
     fontFamily: fonts.semibold,
     fontSize: 22,

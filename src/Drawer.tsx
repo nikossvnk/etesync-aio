@@ -44,6 +44,12 @@ const menuItems: MenuItem[] = [
 // The calendar, the tasks and the contacts, which are next to the notes
 export const pimMenuItems: MenuItem[] = [
   {
+    title: "Search all",
+    path: "SearchAll",
+    icon: "magnify",
+    link: "/search-all",
+  },
+  {
     title: "Calendar",
     path: "Calendar",
     icon: "calendar-month-outline",

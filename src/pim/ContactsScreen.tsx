@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { Linking, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { RouteProp, useNavigation } from "@react-navigation/native";
@@ -13,6 +13,7 @@ import { useSyncGate } from "../SyncGate";
 import { RootStackParamList } from "../RootStackParamList";
 import { StoreState } from "../store";
 import { useNoteSearch } from "../search";
+import { openExternalUrl, safeExternalUrl } from "../helpers";
 import LoadingIndicator from "../widgets/LoadingIndicator";
 import NotFound from "../widgets/NotFound";
 import { fonts, useTheme } from "../theme";
@@ -126,7 +127,7 @@ export function ContactDetails(props: { contact: ContactType }) {
   const bday = contactBirthday(contact);
   const rows: { label: string, value: string, link?: string }[] = [
     ...values(contact, "email").map((x) => ({ label: (x.type) ? `Email (${x.type})` : "Email", value: x.value, link: `mailto:${x.value}` })),
-    ...values(contact, "tel").map((x) => ({ label: (x.type) ? `Phone (${x.type})` : "Phone", value: x.value, link: `tel:${x.value}` })),
+    ...values(contact, "tel").map((x) => ({ label: (x.type) ? `Phone (${x.type})` : "Phone", value: x.value, link: `tel:${x.value.replace(/\s/g, "")}` })),
     ...values(contact, "adr").map((x) => ({ label: "Address", value: x.value })),
     ...((bday) ? [{ label: "Birthday", value: fmt.dayMonth.format(new Date(bday.year ?? 2000, bday.month, bday.day)) + ((bday.year) ? ` ${bday.year}` : "") }] : []),
     ...values(contact, "url").map((x) => ({ label: "Website", value: x.value, link: x.value })),
@@ -148,8 +149,8 @@ export function ContactDetails(props: { contact: ContactType }) {
           </View>
         </View>
         <View style={styles.actions}>
-          <Action icon="email-outline" label="Email" onPress={(email) ? () => Linking.openURL(`mailto:${email}`) : undefined} />
-          <Action icon="phone-outline" label="Call" onPress={(phone) ? () => Linking.openURL(`tel:${phone}`) : undefined} />
+          <Action icon="email-outline" label="Email" onPress={(email) ? () => openExternalUrl(`mailto:${email}`) : undefined} />
+          <Action icon="phone-outline" label="Call" onPress={(phone) ? () => openExternalUrl(`tel:${phone.replace(/\s/g, "")}`) : undefined} />
           <Action icon="calendar-plus" label="Schedule" onPress={() => navigation.navigate("EventEdit", { title: `With ${name}`, attendeeName: name, attendeeEmail: email })} />
           <Action icon="pencil-outline" label="Edit contact" iconOnly onPress={() => navigation.navigate("ContactEdit", { colUid: contact.collectionUid, itemUid: contact.itemUid })} />
         </View>
@@ -163,8 +164,8 @@ export function ContactDetails(props: { contact: ContactType }) {
               <Text style={[styles.dt, { color: theme.colors.textMuted }]}>{x.label}</Text>
               <Text
                 selectable
-                style={{ flex: 1, color: (x.link) ? theme.colors.accentText : theme.colors.text }}
-                onPress={(x.link) ? () => Linking.openURL(x.link!) : undefined}
+                style={{ flex: 1, color: (x.link && safeExternalUrl(x.link)) ? theme.colors.accentText : theme.colors.text }}
+                onPress={(x.link && safeExternalUrl(x.link)) ? () => openExternalUrl(x.link!) : undefined}
               >
                 {x.value}
               </Text>

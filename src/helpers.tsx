@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { AppState, AppStateStatus, Platform, useWindowDimensions } from "react-native";
+import { AppState, AppStateStatus, Linking, Platform, useWindowDimensions } from "react-native";
 import * as Etebase from "etebase";
 
 import { logger } from "./logging";
@@ -223,4 +223,26 @@ export function serverName(serverUrl: string) {
     return trimmed;
   }
   return (match[1].toLowerCase() === "http") ? trimmed : match[2];
+}
+
+// Links from synced data (e.g. a contact's website, which anyone who shares an address book can
+// set) are only opened when they are web, email or phone links. Others (e.g. "javascript:") could
+// run code with the app's origin, which has the login in its storage.
+export function safeExternalUrl(url: string): string | undefined {
+  const trimmed = url.trim();
+  // A web address without its scheme (e.g. "example.com/page") is a web link
+  const withScheme = (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    return (["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol)) ? parsed.toString() : undefined;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+export function openExternalUrl(url: string) {
+  const safe = safeExternalUrl(url);
+  if (safe) {
+    Linking.openURL(safe);
+  }
 }

@@ -69,6 +69,15 @@ export function initials(name: string) {
 
 // The month and day (and year, when known) of a contact's birthday
 export function contactBirthday(contact: ContactType): { month: number, day: number, year?: number } | undefined {
+  try {
+    return readBirthday(contact);
+  } catch (e) {
+    // (one that can't be read is left out)
+    return undefined;
+  }
+}
+
+function readBirthday(contact: ContactType): { month: number, day: number, year?: number } | undefined {
   const prop = contact.comp.getFirstProperty("bday");
   if (!prop) {
     return undefined;
@@ -93,8 +102,16 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
   const byUid = new Map(calendars.map((x) => [x.colUid, x]));
   const toTime = ICAL.Time.fromJSDate(to, false);
   for (const event of events) {
+    // (an event that can't be shown, e.g. with dates that can't be read, is left out)
+    try {
+      addEvent(event);
+    } catch (e) {
+      // (left out)
+    }
+  }
+  function addEvent(event: EventType) {
     if (!event.startDate) {
-      continue;
+      return;
     }
     const calendar = byUid.get(event.collectionUid!);
     const allDay = event.startDate.isDate;

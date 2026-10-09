@@ -37,6 +37,31 @@ themselves are not changed.
 - `src/pim/`: the new screens, `data.ts` (reading and saving items through the notes' offline
   queue) and the model from etesync-web.
 
+## Security and privacy
+
+- **End-to-end encrypted.** Notes, events, tasks and contacts are encrypted on the device (by Etebase)
+  before they're sent, and decrypted on the device after they're received. `e2e/tests/privacy.js`
+  checks this on the real traffic: while a note, an event, a task and a contact are made, nothing of
+  them, nor the password (which is never sent, the login proves it without), nor which kinds of
+  collections there are, is in anything sent to or received from the server, while the server does
+  have them (readable only with the account's keys). The app talks to no other host.
+- **What stays on the computer.** The browser keeps the login and the synced data in its storage for
+  the app's address, with the contents encrypted like on the server. Kept readable are only what
+  the lists need: the titles of notes and the names of notebooks, calendars, task lists and address
+  books. Logging out removes all of it. A browser has no safe place for keys, so whoever can use the
+  browser profile can use the account (see `local-web/README.md`).
+- **Nothing in synced data runs as code.** Everything is shown as text (no HTML). Links from synced
+  data (contacts' web sites, links in notes) are only opened when they are web, email or phone links.
+  The local web server sends a Content-Security-Policy that only lets the app's own code run, keeps
+  it out of frames, and only answers requests for `localhost` (against DNS rebinding).
+- **Items that can't be read** (e.g. written by another app in a way this one doesn't know) are left
+  out with a message. What's in them isn't shown or logged, and they don't stop the app
+  (`e2e/tests/unreadable.js`).
+- **The server's address** has to start with `https://`, except for servers on the local network.
+- **Dependencies:** `npm audit` reports issues in the build tools (Expo's and React Native's command
+  line tools, Metro), which run when building and aren't part of the app. Fixing them needs major
+  upgrades of Expo.
+
 ## Running it
 
 ```

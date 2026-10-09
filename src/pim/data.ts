@@ -11,7 +11,7 @@ import { useSelector } from "react-redux";
 
 import { store, StoreState } from "../store";
 import { CachedCollection, CachedItem } from "../store/reducers";
-import { addError } from "../store/actions";
+import { pushMessage } from "../store/actions";
 import { saveCollectionLocally, saveItemsLocally } from "../sync/SyncManager";
 import { PimType } from "./pim-types";
 
@@ -42,6 +42,19 @@ export function usePimCollections(colType: string): PimCollection[] {
 
 // Decrypting and parsing an item is slow, so it's only done again when its cache entry changes
 const parsedCache = new WeakMap<CachedItem, PimType | null>();
+// The items that couldn't be read (by their uid), which were already told about
+const unreadable = new Set<string>();
+
+// An item that can't be read (e.g. made by an app that writes it in a way this one doesn't know) is
+// left out, and the user is told once. Its content (which the parser's error has) isn't shown or
+// logged, it could be private, and the error doesn't stop the app like an error of the app would.
+function reportUnreadable(itemUid: string) {
+  if (unreadable.has(itemUid)) {
+    return;
+  }
+  unreadable.add(itemUid);
+  store.dispatch(pushMessage({ message: "An item couldn't be read, so it isn't shown (it may be in a format the app doesn't know).", severity: "warning" }));
+}
 
 async function parseItem<T extends PimType>(colMgr: Etebase.CollectionManager, cachedCol: CachedCollection, cachedItem: CachedItem, parse: (content: string) => T): Promise<T | null> {
   const known = parsedCache.get(cachedItem);
@@ -54,7 +67,7 @@ async function parseItem<T extends PimType>(colMgr: Etebase.CollectionManager, c
     const item = colMgr.getItemManager(col).cacheLoad(cachedItem.cache);
     ret = parse(await item.getContent(Etebase.OutputFormat.String));
   } catch (e) {
-    store.dispatch(addError(e as Error));
+    reportUnreadable(cachedItem.meta.name ?? "");
   }
   parsedCache.set(cachedItem, ret);
   return ret;

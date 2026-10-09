@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { Image, Linking, StyleSheet, View, ViewProps } from "react-native";
+import { Image, StyleSheet, View, ViewProps } from "react-native";
 import { ActivityIndicator, Checkbox, Text, TouchableRipple } from "react-native-paper";
 import { fonts, Theme, useTheme } from "../../theme";
 import MarkdownDisplay, { MarkdownIt, renderRules, RenderRules } from "react-native-markdown-display";
 import { useSelector } from "react-redux";
-import { fontFamilies, FontFamilyKey } from "../../helpers";
+import { fontFamilies, FontFamilyKey, openExternalUrl } from "../../helpers";
 import { StoreState } from "../../store";
 import TaskList from "./markdown-it-tasklist";
 import toggleCheckbox from "./toggle-checkbox";
@@ -347,7 +347,7 @@ const Markdown = React.memo(function _Markdown(props: MarkdownPropsType) {
       style={getStyles(theme, fontSize, fontFamilyKey)}
       mergeStyle
       onLinkPress={(url) => {
-        Linking.openURL(url);
+        openExternalUrl(url);
         return true;
       }}
     >

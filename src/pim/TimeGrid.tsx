@@ -9,26 +9,21 @@ import * as React from "react";
 import { PanResponder, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import Color from "color";
 
 import { fonts, useTheme } from "../theme";
 import { DateFormats } from "./format";
-import { addDays, initials, Occurrence } from "./occurrences";
+import { mono, tint } from "./style";
+
+export { mono, tint };
+import { addDays, initials, isBar, layoutBars, Occurrence } from "./occurrences";
+import { SpanBar } from "./CalendarParts";
 
 export const hourHeight = 48;
+const barHeight = 24;
 const gutterWidth = 56;
 const dayMinutes = 24 * 60;
 // Dragging moves events by quarters of an hour
 const snapMinutes = 15;
-export const mono = Platform.select({ web: "'IBM Plex Mono', ui-monospace, monospace", default: "monospace" });
-
-export function tint(color: string, alpha: number) {
-  try {
-    return Color(color).alpha(alpha).rgb().string();
-  } catch (e) {
-    return color;
-  }
-}
 
 // Whether an event is shown in the hours of a day, rather than above them
 function inHours(x: Occurrence, day: Date) {
@@ -264,12 +259,13 @@ export default function TimeGrid(props: PropsType) {
     return () => clearInterval(id);
   }, []);
 
+  // (the all day row lays them out over all of the days)
+  const allDay = layoutBars(days, occurrences.filter(isBar));
   const perDay = days.map((day) => {
     const next = addDays(day, 1);
     const onDay = occurrences.filter((x) => (x.start < next) && ((x.end > day) || (x.start >= day)));
     return {
       day,
-      top: onDay.filter((x) => !inHours(x, day)),
       placed: placeEvents(onDay.filter((x) => inHours(x, day)), day),
     };
   });
@@ -313,23 +309,25 @@ export default function TimeGrid(props: PropsType) {
         <View style={{ width: gutterWidth, paddingTop: 8 }}>
           <Text style={[styles.gutterText, { color: theme.colors.textMuted }]}>all-day</Text>
         </View>
-        {perDay.map(({ day, top }) => (
-          <View key={day.getTime()} style={[styles.column, styles.allDayColumn, { borderLeftColor: theme.colors.divider }]}>
-            {top.map((x) => (
-              <TouchableRipple
-                key={x.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Event ${x.title}`}
-                onPress={() => props.onEventPress(x)}
-                style={[styles.allDay, { backgroundColor: tint(x.color, 0.26), borderColor: (props.selectedKey === x.key) ? theme.colors.accent : "transparent" }]}
-              >
-                <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: fonts.medium, color: theme.colors.text }}>
-                  {(x.allDay) ? "" : `${fmt.time(x.start)} `}{x.title}
-                </Text>
-              </TouchableRipple>
-            ))}
-          </View>
-        ))}
+        {/* All day events (and ones that go on past midnight), as bars over their days */}
+        <View style={{ flex: 1, height: Math.max(34, allDay.lanes * (barHeight + 3) + 7) }}>
+          {perDay.map(({ day }, idx) => (
+            <View key={day.getTime()} style={[styles.allDayColumn, { left: idx * columnWidth, width: columnWidth, borderLeftColor: theme.colors.divider }]} />
+          ))}
+          {(columnWidth > 0) && allDay.bars.map((bar) => (
+            <View
+              key={bar.occurrence.key}
+              style={{
+                position: "absolute",
+                top: 5 + bar.lane * (barHeight + 3),
+                left: bar.first * columnWidth + ((bar.before) ? 0 : 3),
+                width: (bar.last - bar.first + 1) * columnWidth - ((bar.before) ? 0 : 3) - ((bar.after) ? 0 : 3),
+              }}
+            >
+              <SpanBar bar={bar} height={barHeight} selected={props.selectedKey === bar.occurrence.key} onPress={props.onEventPress} />
+            </View>
+          ))}
+        </View>
       </View>
 
       {/* The hours */}
@@ -419,9 +417,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   allDayColumn: {
-    paddingVertical: 5,
-    paddingHorizontal: 3,
-    gap: 3,
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    borderLeftWidth: StyleSheet.hairlineWidth,
   },
   allDay: {
     borderRadius: 6,

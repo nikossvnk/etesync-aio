@@ -14,7 +14,7 @@ import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useDeviceBreakpoint } from "../helpers";
 import { fonts, useTheme } from "../theme";
 import * as C from "../constants";
-import { tint } from "../pim/TimeGrid";
+import { tint } from "../pim/style";
 
 const mono = Platform.select({ web: "'IBM Plex Mono', ui-monospace, monospace", default: "monospace" });
 

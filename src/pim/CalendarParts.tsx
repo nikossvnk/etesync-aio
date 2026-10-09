@@ -11,16 +11,22 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { fonts, useTheme } from "../theme";
 import { DateFormats } from "./format";
-import { addDays, initials, Occurrence, onDay, startOfDay } from "./occurrences";
+import { addDays, Bar, dayCount, dayOf, initials, Occurrence, onDay, startOfDay } from "./occurrences";
 import { TaskType } from "./pim-types";
-import { mono, tint } from "./TimeGrid";
+import { mono, tint } from "./style";
 
-export function formatRange(x: Occurrence, fmt: DateFormats) {
+// When an event is, e.g. "10:00 – 11:00", "All day", "All day · 4 days", or on one of its days "All
+// day · day 2 of 4"
+export function formatRange(x: Occurrence, fmt: DateFormats, day?: Date) {
+  const days = dayCount(x);
   if (x.allDay) {
-    const days = Math.round((x.end.getTime() - x.start.getTime()) / (24 * 3600 * 1000));
-    return (days > 1) ? `All day · ${days} days` : "All day";
+    if (days === 1) {
+      return "All day";
+    }
+    return (day) ? `All day · day ${dayOf(x, day)} of ${days}` : `All day · ${days} days`;
   }
-  return `${fmt.time(x.start)} – ${fmt.time(x.end)}`;
+  const range = `${fmt.time(x.start)} – ${fmt.time(x.end)}`;
+  return (day && (days > 1)) ? `${range} · day ${dayOf(x, day)} of ${days}` : range;
 }
 
 function Label(props: { children: React.ReactNode, color?: string }) {
@@ -57,7 +63,7 @@ function Place(props: { location: string }) {
 }
 
 // An event as a card, in the list of the events of a day
-export function EventCard(props: { x: Occurrence, fmt: DateFormats, onPress: (x: Occurrence) => void }) {
+export function EventCard(props: { x: Occurrence, fmt: DateFormats, onPress: (x: Occurrence) => void, day?: Date }) {
   const theme = useTheme();
   const { x, fmt } = props;
   return (
@@ -70,7 +76,7 @@ export function EventCard(props: { x: Occurrence, fmt: DateFormats, onPress: (x:
       <View style={{ gap: 6 }}>
         <View style={styles.iconRow}>
           <View style={[styles.dot, { backgroundColor: x.color }]} />
-          <Text style={[styles.mono, { color: theme.colors.textMuted }]}>{formatRange(x, fmt)}{(x.repeats && x.event) ? " · repeats" : ""}</Text>
+          <Text style={[styles.mono, { color: theme.colors.textMuted }]}>{formatRange(x, fmt, props.day)}{(x.repeats && x.event) ? " · repeats" : ""}</Text>
           <Text style={{ fontSize: 12, color: theme.colors.textMuted }} numberOfLines={1}>{x.calendarName}</Text>
         </View>
         <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{x.title}</Text>
@@ -108,7 +114,7 @@ export function DayPanel(props: { day: Date, occurrences: Occurrence[], fmt: Dat
         </View>
       ) : (
         <View style={{ gap: 8 }}>
-          {events.map((x) => <EventCard key={x.key} x={x} fmt={fmt} onPress={props.onEventPress} />)}
+          {events.map((x) => <EventCard key={x.key} x={x} fmt={fmt} day={day} onPress={props.onEventPress} />)}
         </View>
       )}
       {(upcoming.length > 0) && (
@@ -177,7 +183,7 @@ export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: 
       </View>
       <Text style={[styles.detailsTitle, { color: theme.colors.text }]}>{x.title}</Text>
       <View>
-        <Text style={{ color: theme.colors.textSecondary }}>{fmt.day.format(x.start)}</Text>
+        <Text style={{ color: theme.colors.textSecondary }}>{formatDays(x, fmt)}</Text>
         <Text style={[styles.mono, { fontSize: 13, color: theme.colors.textSecondary }]}>{formatRange(x, fmt)}</Text>
         {x.repeats && x.event && <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 2 }}>Repeats</Text>}
       </View>
@@ -483,6 +489,21 @@ const styles = StyleSheet.create({
     minHeight: 38,
     paddingHorizontal: 6,
   },
+  spanBar: {
+    borderWidth: 1,
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  spanBarInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  spanMark: {
+    width: 3,
+    height: 12,
+    borderRadius: 2,
+  },
   agenda: {
     width: "100%",
     maxWidth: 900,
@@ -519,3 +540,53 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
 });
+
+// An event that covers days, as a bar over them: a mark of its color, its title, and how many days it
+// is (when it starts and ends in the row). Where it goes on before or after the row, its end is
+// straight, with an arrow.
+export function SpanBar(props: { bar: Bar, height: number, compact?: boolean, selected?: boolean, onPress: (x: Occurrence) => void }) {
+  const theme = useTheme();
+  const { bar, height } = props;
+  const x = bar.occurrence;
+  const days = dayCount(x);
+  const radius = Math.min(6, height / 2);
+  return (
+    <TouchableRipple
+      accessibilityRole="button"
+      accessibilityLabel={`Event ${x.title}${(days > 1) ? `, ${days} days` : ", all day"}`}
+      aria-selected={!!props.selected}
+      testID="span-bar"
+      onPress={() => props.onPress(x)}
+      style={[styles.spanBar, {
+        height,
+        backgroundColor: tint(x.color, (theme.dark) ? 0.3 : 0.24),
+        borderColor: (props.selected) ? x.color : "transparent",
+        borderTopLeftRadius: (bar.before) ? 0 : radius,
+        borderBottomLeftRadius: (bar.before) ? 0 : radius,
+        borderTopRightRadius: (bar.after) ? 0 : radius,
+        borderBottomRightRadius: (bar.after) ? 0 : radius,
+        paddingHorizontal: (props.compact) ? 0 : 8,
+      }]}
+    >
+      {(props.compact) ? <View /> : (
+        <View style={styles.spanBarInner}>
+          {bar.before && <MaterialCommunityIcons name="arrow-left" size={12} color={theme.colors.textSecondary} />}
+          <View style={[styles.spanMark, { backgroundColor: x.color }]} />
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, fontFamily: fonts.medium, color: theme.colors.text }}>{x.title}</Text>
+          {(!bar.before && !bar.after && (days > 1)) && <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{days} days</Text>}
+          {bar.after && <MaterialCommunityIcons name="arrow-right" size={12} color={theme.colors.textSecondary} />}
+        </View>
+      )}
+    </TouchableRipple>
+  );
+}
+
+// The days of an event that covers several, e.g. "Thu 8 – Sun 11 October"
+export function formatDays(x: Occurrence, fmt: DateFormats) {
+  const last = new Date(x.end.getTime() - 1);
+  if (dayCount(x) === 1) {
+    return fmt.day.format(x.start);
+  }
+  const sameMonth = last.getMonth() === x.start.getMonth();
+  return `${fmt.weekDay.format(x.start)} ${(sameMonth) ? x.start.getDate() : fmt.dayMonth.format(x.start)} – ${fmt.weekDay.format(last)} ${fmt.dayMonth.format(last)}`;
+}

@@ -21,8 +21,8 @@ import { savePimItem, usePimItems } from "./data";
 import { AccentButton, EmptyState, toDateString } from "./widgets";
 import { useDateFormats } from "./format";
 import TimeGrid, { mono, tint } from "./TimeGrid";
-import { addDays, Occurrence, onDay, sameDay, startOfDay, useOccurrences } from "./occurrences";
-import { Agenda, DayPanel, EventDetails, MiniMonth, panelStyle, SmallButton, TasksDue } from "./CalendarParts";
+import { addDays, dayCount, isBar, layoutBars, Occurrence, onDay, sameDay, startOfDay, useOccurrences } from "./occurrences";
+import { Agenda, DayPanel, EventDetails, MiniMonth, panelStyle, SmallButton, SpanBar, TasksDue } from "./CalendarParts";
 import { setTaskDone } from "./TasksScreen";
 
 export type { Occurrence } from "./occurrences";
@@ -62,6 +62,8 @@ export default function CalendarScreen() {
   const [selected, setSelected] = React.useState(today);
   // The event chosen in the week view, whose details are shown next to it
   const [selectedKey, setSelectedKey] = React.useState<string>();
+  // The width of the month's weeks, to put the bars of the events of several days over their days
+  const [rowWidth, setRowWidth] = React.useState(0);
   const tasks = usePimItems(etebase, C.tasksType, TaskType.parse);
 
   // The days the view shows
@@ -305,6 +307,11 @@ export default function CalendarScreen() {
   }
 
   // The month
+  const multiDay = occurrences.filter((x) => isBar(x) && (dayCount(x) > 1));
+  const barHeight = (wide) ? 20 : 6;
+  const barGap = 3;
+  // Where the bars start: below the number of the day (the day's border, padding and number)
+  const barsTop = 1.5 + 6 + 26 + barGap;
   const weekendColor = tint(theme.colors.text, (theme.dark) ? 0.012 : 0.02);
   const dayColor = tint(theme.colors.text, (theme.dark) ? 0.04 : 0.035);
   const panel = (
@@ -328,75 +335,97 @@ export default function CalendarScreen() {
               <Text key={x.getDay()} style={[styles.weekDay, { color: theme.colors.textMuted }]}>{fmt.weekDay.format(x)}</Text>
             ))}
           </View>
-          {[0, 1, 2, 3, 4, 5].map((week) => (
-            <View key={week} style={styles.week}>
-              {days.slice(week * 7, week * 7 + 7).map((day) => {
-                const dayEvents = onDay(occurrences, day);
-                const inMonth = day.getMonth() === month.getMonth();
-                const weekend = (day.getDay() === 0) || (day.getDay() === 6);
-                const isSelected = day.getTime() === selected.getTime();
-                const isToday = day.getTime() === today.getTime();
-                const max = (wide) ? 3 : 2;
-                return (
-                  <TouchableRipple
-                    key={day.getTime()}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${fmt.day.format(day)}, ${dayEvents.length} events`}
-                    aria-selected={isSelected}
-                    onPress={() => setSelected(day)}
-                    onLongPress={() => {
-                      select(day);
-                      setView("day");
-                    }}
-                    style={[styles.day, { minHeight: (wide) ? 116 : 72, backgroundColor: (inMonth) ? ((weekend) ? weekendColor : dayColor) : "transparent",
-                      borderColor: (isSelected) ? theme.colors.accent : "transparent" }]}
-                  >
-                    <View style={{ gap: 3 }}>
-                      {(isToday) ? (
-                        <View style={[styles.todayNumber, { backgroundColor: theme.colors.accent }]}>
-                          <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: theme.colors.onAccent }}>{day.getDate()}</Text>
-                        </View>
-                      ) : (
-                        <Text style={[styles.dayNumber, { color: (inMonth) ? theme.colors.textSecondary : theme.colors.disabled }]}>{day.getDate()}</Text>
-                      )}
-                      {(!wide) && (
-                        <View style={styles.dots}>
-                          {dayEvents.slice(0, 5).map((x) => (
-                            <View key={x.key} style={[styles.eventDot, { backgroundColor: x.color, opacity: (inMonth) ? 1 : 0.55 }]} />
-                          ))}
-                        </View>
-                      )}
-                      {(wide) && dayEvents.slice(0, max).map((x) => {
-                        if (x.allDay) {
-                          // Events of several days join from one day to the next
-                          const first = sameDay(x.start, day);
-                          const last = x.end <= addDays(day, 1);
+          {[0, 1, 2, 3, 4, 5].map((week) => {
+            const rowDays = days.slice(week * 7, week * 7 + 7);
+            // Events of several days are bars over them, on lines of their own; the days give them room
+            const { bars, lanes } = layoutBars(rowDays, multiDay);
+            const cellWidth = (rowWidth - 6 * cellGap) / 7;
+            const step = barHeight + barGap;
+            return (
+              <View key={week} style={styles.week} onLayout={(week === 0) ? (e) => setRowWidth(e.nativeEvent.layout.width) : undefined}>
+                {rowDays.map((day) => {
+                  const dayEvents = onDay(occurrences, day);
+                  const own = dayEvents.filter((x) => !multiDay.includes(x));
+                  const inMonth = day.getMonth() === month.getMonth();
+                  const weekend = (day.getDay() === 0) || (day.getDay() === 6);
+                  const isSelected = day.getTime() === selected.getTime();
+                  const isToday = day.getTime() === today.getTime();
+                  // (the bars take the place of some of the day's own events)
+                  const max = Math.max(0, 3 - lanes);
+                  return (
+                    <TouchableRipple
+                      key={day.getTime()}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${fmt.day.format(day)}, ${dayEvents.length} events`}
+                      aria-selected={isSelected}
+                      onPress={() => setSelected(day)}
+                      onLongPress={() => {
+                        select(day);
+                        setView("day");
+                      }}
+                      style={[styles.day, { minHeight: (wide) ? 116 : 72, backgroundColor: (inMonth) ? ((weekend) ? weekendColor : dayColor) : "transparent",
+                        borderColor: (isSelected) ? theme.colors.accent : "transparent" }]}
+                    >
+                      <View style={{ gap: barGap }}>
+                        {(isToday) ? (
+                          <View style={[styles.todayNumber, { backgroundColor: theme.colors.accent }]}>
+                            <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: theme.colors.onAccent }}>{day.getDate()}</Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.dayNumber, { color: (inMonth) ? theme.colors.textSecondary : theme.colors.disabled }]}>{day.getDate()}</Text>
+                        )}
+                        {(lanes > 0) && <View style={{ height: lanes * step - barGap }} />}
+                        {(!wide) && (
+                          <View style={styles.dots}>
+                            {own.slice(0, 5).map((x) => (
+                              <View key={x.key} style={[styles.eventDot, { backgroundColor: x.color, opacity: (inMonth) ? 1 : 0.55 }]} />
+                            ))}
+                          </View>
+                        )}
+                        {(wide) && own.slice(0, max).map((x) => {
+                          if (x.allDay) {
+                            return (
+                              <View key={x.key} style={[styles.bar, { backgroundColor: tint(x.color, 0.26), borderRadius: 6, opacity: (inMonth) ? 1 : 0.55 }]}>
+                                <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: fonts.medium, color: theme.colors.text }}>{x.title}</Text>
+                              </View>
+                            );
+                          }
                           return (
-                            <View key={x.key} style={[styles.bar, { backgroundColor: tint(x.color, 0.26),
-                              borderTopLeftRadius: (first) ? 6 : 2, borderBottomLeftRadius: (first) ? 6 : 2,
-                              borderTopRightRadius: (last) ? 6 : 2, borderBottomRightRadius: (last) ? 6 : 2,
-                              opacity: (inMonth) ? 1 : 0.55 }]}>
-                              <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: fonts.medium, color: theme.colors.text }}>{x.title}</Text>
+                            <View key={x.key} style={[styles.timed, { opacity: (inMonth) ? 1 : 0.55 }]}>
+                              <View style={[styles.eventDot, { backgroundColor: x.color }]} />
+                              <Text style={[styles.mono, { color: theme.colors.textMuted }]}>{fmt.time(x.start)}</Text>
+                              <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: theme.colors.textBody }}>{x.title}</Text>
                             </View>
                           );
-                        }
-                        return (
-                          <View key={x.key} style={[styles.timed, { opacity: (inMonth) ? 1 : 0.55 }]}>
-                            <View style={[styles.eventDot, { backgroundColor: x.color }]} />
-                            {wide && <Text style={[styles.mono, { color: theme.colors.textMuted }]}>{fmt.time(x.start)}</Text>}
-                            <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: theme.colors.textBody }}>{x.title}</Text>
-                          </View>
-                        );
-                      })}
-                      {(wide) && (dayEvents.length > max) && (
-                        <Text style={{ fontSize: 12, color: theme.colors.textMuted, paddingLeft: 4 }}>+{dayEvents.length - max} more</Text>
-                      )}
+                        })}
+                        {(wide) && (own.length > max) && (
+                          <Text style={{ fontSize: 12, color: theme.colors.textMuted, paddingLeft: 4 }}>+{own.length - max} more</Text>
+                        )}
+                      </View>
+                    </TouchableRipple>
+                  );
+                })}
+                {(rowWidth > 0) && bars.map((bar) => {
+                  const left = bar.first * (cellWidth + cellGap) + ((bar.before) ? 0 : 6);
+                  const right = bar.last * (cellWidth + cellGap) + cellWidth - ((bar.after) ? 0 : 6);
+                  const selectedHere = (selected >= rowDays[bar.first]) && (selected <= rowDays[bar.last]) &&
+                    (selected >= startOfDay(bar.occurrence.start)) && (selected < bar.occurrence.end);
+                  return (
+                    <View key={bar.occurrence.key} style={{ position: "absolute", top: barsTop + bar.lane * step, left, width: right - left }}>
+                      <SpanBar
+                        bar={bar}
+                        height={barHeight}
+                        compact={!wide}
+                        selected={selectedHere}
+                        // (choosing one chooses its first day in the week)
+                        onPress={() => setSelected(rowDays[bar.first])}
+                      />
                     </View>
-                  </TouchableRipple>
-                );
-              })}
-            </View>
-          ))}
+                  );
+                })}
+              </View>
+            );
+          })}
           {!wide && <View style={{ marginTop: 16 }}>{panel}</View>}
         </ScrollView>
         {wide && side(panel)}
@@ -404,6 +433,8 @@ export default function CalendarScreen() {
     </View>
   );
 }
+
+const cellGap = 4;
 
 const styles = StyleSheet.create({
   header: {
@@ -459,7 +490,7 @@ const styles = StyleSheet.create({
   },
   week: {
     flexDirection: "row",
-    gap: 4,
+    gap: cellGap,
   },
   weekDay: {
     flex: 1,

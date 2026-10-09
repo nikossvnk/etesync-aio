@@ -83,7 +83,7 @@ declare module "ical.js" {
   export class Time {
     static public fromString(str: string): Time;
     static public fromJSDate(aDate: Date | null, useUTC: boolean): Time;
-    static public fromData(aData: TimeJsonData): Time;
+    static public fromData(aData: TimeJsonData, aZone?: Timezone): Time;
 
     static public now(): Time;
 

@@ -13,6 +13,7 @@ import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
 import { fonts, useTheme } from "../theme";
 import { PimCollection } from "./data";
+import * as zoneData from "./data/zones.json";
 
 export function ColorDot(props: { color: string, size?: number, style?: StyleProp<ViewStyle> }) {
   const size = props.size ?? 10;
@@ -270,6 +271,16 @@ const styles = StyleSheet.create({
   accent: {
     borderRadius: 10,
   },
+  zoneList: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  zoneItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
   accentInner: {
     height: 40,
     paddingHorizontal: 16,
@@ -339,4 +350,55 @@ export function applyRepeat(comp: ICAL.Component, repeat: RepeatKey) {
   } else if (repeatKeyOf(comp.getFirstPropertyValue("rrule")) !== repeat) {
     comp.updatePropertyWithValue("rrule", new ICAL.Recur({ freq: repeat } as any));
   }
+}
+
+// The time zones (as in the iCalendar data of the web app), and UTC
+const timezones: string[] = ["UTC", ...Object.keys(zoneData.zones).sort()];
+
+export function timezoneName(zone: string) {
+  return zone.replace(/_/g, " ");
+}
+
+// Choosing a time zone, by typing a part of its name (e.g. "berlin" or "new york")
+export function TimezonePicker(props: { value: string, onChange: (zone: string) => void, disabled?: boolean }) {
+  const theme = useTheme();
+  const [query, setQuery] = React.useState<string>();
+  const searching = query !== undefined;
+  const q = (query ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+  const matches = (searching) ? timezones.filter((x) => x.toLowerCase().includes(q)).slice(0, 8) : [];
+
+  return (
+    <View>
+      <FieldInput
+        value={(searching) ? query : timezoneName(props.value)}
+        editable={!props.disabled}
+        onFocus={() => setQuery("")}
+        // (later than a press on one of the time zones, which ends the search itself)
+        onBlur={() => setTimeout(() => setQuery(undefined), 200)}
+        onChangeText={setQuery}
+        placeholder={timezoneName(props.value)}
+        accessibilityLabel="Time zone"
+        style={(props.disabled) ? { opacity: 0.5 } : undefined}
+      />
+      {searching && (
+        <View style={[styles.zoneList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]} testID="timezone-list">
+          {matches.map((zone) => (
+            <TouchableRipple
+              key={zone}
+              accessibilityRole="button"
+              accessibilityLabel={`Time zone ${timezoneName(zone)}`}
+              onPress={() => {
+                props.onChange(zone);
+                setQuery(undefined);
+              }}
+              style={styles.zoneItem}
+            >
+              <Text style={{ color: (zone === props.value) ? theme.colors.accentText : theme.colors.text }}>{timezoneName(zone)}</Text>
+            </TouchableRipple>
+          ))}
+          {(matches.length === 0) && <Text style={[styles.zoneItem, { color: theme.colors.textMuted }]}>No time zone matches</Text>}
+        </View>
+      )}
+    </View>
+  );
 }

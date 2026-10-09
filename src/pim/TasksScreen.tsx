@@ -22,7 +22,7 @@ import { PimCollection, savePimItem, usePimCollections, usePimItems } from "./da
 import { AccentButton, EmptyState } from "./widgets";
 import { DateFormats, useDateFormats } from "./format";
 import { addDays, sameDay, startOfDay } from "./occurrences";
-import { mono } from "./TimeGrid";
+import { mono } from "./style";
 import { panelStyle, SmallButton } from "./CalendarParts";
 
 export function formatDue(task: TaskType, fmt: DateFormats) {

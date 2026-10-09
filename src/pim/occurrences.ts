@@ -209,3 +209,59 @@ export function useOccurrences(from: Date, to: Date) {
   }, [events, contacts, calendars, hidden.join(","), fromTime, toTime]);
   return { occurrences, events, calendars, contacts };
 }
+
+function daysBetween(from: Date, to: Date) {
+  return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / (24 * 3600 * 1000));
+}
+
+// How many days an event covers (an all day one ends at the start of the day after its last one)
+export function dayCount(x: Occurrence) {
+  return Math.max(1, daysBetween(x.start, new Date(x.end.getTime() - 1)) + 1);
+}
+
+// The day of an event that a day is, e.g. 2 (of 4)
+export function dayOf(x: Occurrence, day: Date) {
+  return daysBetween(x.start, day) + 1;
+}
+
+export interface Bar {
+  occurrence: Occurrence;
+  // The columns (days of the row) it covers, and the line it's on
+  first: number;
+  last: number;
+  lane: number;
+  // Whether it goes on before the row, or after it
+  before: boolean;
+  after: boolean;
+}
+
+// Lays out events that cover days as bars over a row of days (a week): each one on the first line
+// that is free on its days, so that ones at the same time are on lines of their own
+export function layoutBars(days: Date[], occurrences: Occurrence[]): { bars: Bar[], lanes: number } {
+  const rowStart = days[0];
+  const rowEnd = addDays(days[days.length - 1], 1);
+  const shown = occurrences
+    .filter((x) => (x.start < rowEnd) && (x.end > rowStart))
+    .sort((a, b) => (a.start.getTime() - b.start.getTime()) || (dayCount(b) - dayCount(a)));
+  const laneEnds: number[] = [];
+  const bars: Bar[] = [];
+  for (const x of shown) {
+    const first = Math.max(0, daysBetween(rowStart, x.start));
+    const last = Math.min(days.length - 1, daysBetween(rowStart, new Date(x.end.getTime() - 1)));
+    let lane = laneEnds.findIndex((end) => end < first);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(last);
+    } else {
+      laneEnds[lane] = last;
+    }
+    bars.push({ occurrence: x, first, last, lane, before: x.start < rowStart, after: x.end > rowEnd });
+  }
+  return { bars, lanes: laneEnds.length };
+}
+
+// Whether an event is shown as a bar over days (all day, or going past midnight), rather than at its
+// time on a day
+export function isBar(x: Occurrence) {
+  return x.allDay || (dayCount(x) > 1);
+}

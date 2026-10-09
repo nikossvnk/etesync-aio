@@ -24,6 +24,9 @@ import * as C from "../constants";
 import { EventType, timezoneLoadFromName } from "./pim-types";
 import { eventAttendees } from "./occurrences";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
+import { TimezonePicker, timezoneName } from "./widgets";
+import { useDateFormats } from "./format";
+import { sameDay } from "./occurrences";
 import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString, toTimeString } from "./widgets";
 
 interface PropsType {
@@ -32,6 +35,20 @@ interface PropsType {
 
 function currentTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+function loadZone(name: string) {
+  return (name === "UTC") ? ICAL.Timezone.utcTimezone : timezoneLoadFromName(name);
+}
+
+// The time zone an event's times are in (e.g. "Europe/Berlin", or "UTC"), or undefined for one
+// without (a "floating" time, the same on every device)
+function zoneOf(time: ICAL.Time): string | undefined {
+  const name = time.timezone ?? time.zone?.tzid;
+  if (!name || (name === "floating")) {
+    return undefined;
+  }
+  return (name === "Z" || name === "UTC") ? "UTC" : name;
 }
 
 export default function EventEditScreen(props: PropsType) {
@@ -44,6 +61,7 @@ export default function EventEditScreen(props: PropsType) {
   const etebase = useCredentials()!;
   const syncGate = useSyncGate();
   const calendars = usePimCollections(C.calendarType);
+  const fmt = useDateFormats();
   const events = usePimItems(etebase, C.calendarType, EventType.parse);
   const existing = (itemUid) ? events?.find((x) => (x.itemUid === itemUid) && (x.collectionUid === colUid)) : undefined;
 
@@ -57,6 +75,8 @@ export default function EventEditScreen(props: PropsType) {
   const [endTime, setEndTime] = React.useState(`${String(Math.min(startHour + 1, 23)).padStart(2, "0")}:${(startHour === 23) ? "59" : "00"}`);
   const [location, setLocation] = React.useState("");
   const [repeat, setRepeat] = React.useState<RepeatKey>("none");
+  // The time zone the times are in (the device's, unless the event is in another one)
+  const [timezone, setTimezone] = React.useState(currentTimezone());
   const [description, setDescription] = React.useState("");
   const [error, setError] = React.useState<string>();
   const [deleteShown, setDeleteShown] = React.useState(false);
@@ -68,8 +88,17 @@ export default function EventEditScreen(props: PropsType) {
       return;
     }
     if (existing) {
-      const start = existing.startDate.convertToZone(ICAL.Timezone.localTimezone).toJSDate();
-      let end = (existing.endDate ?? existing.startDate).convertToZone(ICAL.Timezone.localTimezone).toJSDate();
+      // The times as they are in the event's time zone (or on this device, for one without)
+      const zone = (!existing.startDate.isDate) ? zoneOf(existing.startDate) : undefined;
+      const known = !!zone && !!loadZone(zone);
+      const wallClock = (time: ICAL.Time) => (known) ?
+        new Date(time.year, time.month - 1, time.day, time.hour, time.minute) :
+        time.convertToZone(ICAL.Timezone.localTimezone).toJSDate();
+      if (known) {
+        setTimezone(zone!);
+      }
+      const start = wallClock(existing.startDate);
+      let end = wallClock(existing.endDate ?? existing.startDate);
       if (existing.startDate.isDate) {
         // All day events end at the start of the day after their last one
         end = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
@@ -121,28 +150,23 @@ export default function EventEditScreen(props: PropsType) {
       return;
     }
 
+    // The times are in the chosen time zone (all day events have none)
+    const zone = (!allDay) ? loadZone(timezone) : null;
     function toIcal(date: Date) {
-      const ret = ICAL.Time.fromJSDate(date, false);
-      if (!allDay) {
-        return ret;
+      const data = { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes(), second: 0 };
+      if (allDay) {
+        return ICAL.Time.fromData({ ...data, hour: 0, minute: 0, isDate: true });
       }
-      const data = ret.toJSON();
-      data.isDate = true;
-      return ICAL.Time.fromData(data);
+      return (zone) ? ICAL.Time.fromData({ ...data, isDate: false }, zone) : ICAL.Time.fromJSDate(date, false);
     }
-    let icalStart = toIcal(start);
-    let icalEnd = toIcal(end);
+    const icalStart = toIcal(start);
+    const icalEnd = toIcal(end);
     if (allDay) {
       icalEnd.adjust(1, 0, 0, 0);
     }
     if (icalStart.compare(icalEnd) >= 0) {
       setError("The end has to be after the start");
       return;
-    }
-    const timezone = (!allDay) ? timezoneLoadFromName(currentTimezone()) : null;
-    if (timezone) {
-      icalStart = icalStart.convertToZone(timezone);
-      icalEnd = icalEnd.convertToZone(timezone);
     }
 
     const event = existing?.clone() ?? new EventType();
@@ -212,6 +236,25 @@ export default function EventEditScreen(props: PropsType) {
             <DateTimeInput mode="time" value={endTime} onChange={setEndTime} accessibilityLabel="End time" disabled={allDay} />
           </Field>
         </View>
+        {!allDay && (
+          <Field label="Time zone">
+            <TimezonePicker value={timezone} onChange={setTimezone} />
+            {(timezone !== currentTimezone()) && (() => {
+              // The start, where the device is
+              const start = fromDateTimeStrings(startDate, startTime);
+              const zone = loadZone(timezone);
+              if (!start || !zone) {
+                return null;
+              }
+              const local = ICAL.Time.fromData({ year: start.getFullYear(), month: start.getMonth() + 1, day: start.getDate(), hour: start.getHours(), minute: start.getMinutes(), second: 0 }, zone).toJSDate();
+              return (
+                <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }} testID="timezone-local">
+                  Starts at {fmt.time(local)}{(sameDay(local, start)) ? "" : ` on ${fmt.day.format(local)}`} where you are ({timezoneName(currentTimezone())})
+                </Text>
+              );
+            })()}
+          </Field>
+        )}
         <Field label="Repeat">
           <RepeatPicker value={repeat} onChange={setRepeat} />
         </Field>

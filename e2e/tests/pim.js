@@ -91,6 +91,12 @@ run(async () => {
     `DTSTART:${icalDate(today)}T100000`, `DTEND:${icalDate(today)}T103000`, `SUMMARY:Standup ${n}`,
     `RRULE:FREQ=WEEKLY;BYDAY=${["SU", "MO", "TU", "WE", "TH", "FR", "SA"][today.getDay()]}`, "END:VEVENT", "END:VCALENDAR", "",
   ].join("\r\n"));
+  const tripEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3);
+  await addItem(etebase, byType(types.calendar), [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//e2e", "BEGIN:VEVENT", `UID:trip-${n}`,
+    `DTSTART;VALUE=DATE:${icalDate(today)}`, `DTEND;VALUE=DATE:${icalDate(tripEnd)}`, `SUMMARY:Trip ${n}`,
+    "END:VEVENT", "END:VCALENDAR", "",
+  ].join("\r\n"));
   await addItem(etebase, byType(types.tasks), [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//e2e", "BEGIN:VTODO", `UID:milk-${n}`,
     `SUMMARY:Buy milk ${n}`, "STATUS:NEEDS-ACTION", "END:VTODO", "END:VCALENDAR", "",
@@ -152,6 +158,37 @@ run(async () => {
     const all = s.filter((x) => x.type === types.calendar).flatMap((x) => x.contents);
     return all.some((c) => c.includes(`SUMMARY:Dentist (moved) ${n}`)) && !all.some((c) => c.includes(`SUMMARY:Dentist ${n}`));
   }));
+
+  // Events of several days are bars over their days
+  const tripBars = p.getByRole("button", { name: new RegExp(`^Event Trip ${n}, 3 days$`) }).locator("visible=true");
+  const barCount = await tripBars.count();
+  const crosses = (today.getDay() === 0) || (today.getDay() === 6);
+  check("an event of several days is a bar over them in the month", barCount === ((crosses) ? 2 : 1), barCount);
+  if (!crosses) {
+    check("which says how many days it is", (await tripBars.first().innerText()).includes("3 days"), await tripBars.first().innerText());
+  }
+  await tripBars.first().click(); await wait(800);
+  const dayPanel = p.locator('[data-testid="day-panel"] >> visible=true');
+  check("choosing it shows it on its first day, with which day of it that is", (await dayPanel.innerText()).includes(`Trip ${n}`) &&
+    (await dayPanel.innerText()).includes("All day · day 1 of 3"), await dayPanel.innerText());
+
+  // An event in another time zone
+  await btn(/^new event$/i).click(); await wait(2000);
+  await vis('input[aria-label="Title"]').fill(`Call New York ${n}`);
+  await vis('input[aria-label="Start time"]').fill("10:00");
+  await vis('input[aria-label="End time"]').fill("11:00");
+  await vis('input[aria-label="Time zone"]').click(); await wait(300);
+  await vis('input[aria-label="Time zone"]').fill("new york"); await wait(500);
+  await btn(/^time zone america\/new york$/i).click(); await wait(500);
+  check("choosing another time zone says when it starts here", await A.has("where you are"), await A.text());
+  await btn(/^save$/i).click(); await wait(3000);
+  check("the event is on the server in that time zone", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
+    x.contents.some((c) => c.includes(`SUMMARY:Call New York ${n}`) && c.includes(`DTSTART;TZID=America/New_York:${icalDate(today)}T100000`) &&
+      c.includes("BEGIN:VTIMEZONE") && c.includes("TZID:America/New_York")))), serverDetail(types.calendar)());
+  await p.getByRole("button", { name: `Event Call New York ${n}` }).locator("visible=true").first().click(); await wait(2000);
+  check("opened again, it's in its time zone", ((await vis('input[aria-label="Start time"]').inputValue()) === "10:00") &&
+    ((await vis('input[aria-label="Time zone"]').inputValue()) === "America/New York"));
+  await btn(/^back$/i).click(); await wait(1500);
 
   // An event that repeats every week
   await btn(/^new event$/i).click(); await wait(2000);
@@ -220,6 +257,14 @@ run(async () => {
   check("dragging its lower edge changes when it ends", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => (
     c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T160000`).test(c) && new RegExp(`DTEND[^:]*:${icalDate(today)}T173000`).test(c)
   )))), serverDetail(types.calendar)());
+
+  // The all day row has the trip as a bar, and its details have its days
+  const weekTrip = grid.getByRole("button", { name: new RegExp(`^Event Trip ${n}, 3 days$`) });
+  check("the week's all day row has the event of several days as a bar", (await weekTrip.count()) >= 1, await weekTrip.count());
+  await weekTrip.first().click(); await wait(800);
+  const tripDetails = p.locator('[data-testid="event-details"] >> visible=true');
+  check("its details have its days", (await tripDetails.count() === 1) && (await tripDetails.innerText()).includes("All day · 3 days") &&
+    / – /.test(await tripDetails.innerText()), (await tripDetails.count()) ? await tripDetails.innerText() : "no details");
 
   // Choosing an event in the week shows its details next to it
   await standup.click(); await wait(800);

@@ -11,7 +11,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { AuthField, AuthHeading, AuthInput, AuthLayout, ErrorBox, PasswordField, PrimaryButton, ServerBox } from "../components/Auth";
 import { fonts, useTheme } from "../theme";
-import { tint } from "../pim/TimeGrid";
+import { tint } from "../pim/style";
 
 import { useAsyncDispatch } from "../store";
 

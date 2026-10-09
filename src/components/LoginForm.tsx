@@ -2,19 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-
-import { View, TextInput as NativeTextInput } from "react-native";
-import { Switch, HelperText, Paragraph, TouchableRipple } from "react-native-paper";
-
-
-import LinkButton from "../widgets/LinkButton";
-import Row from "../widgets/Row";
-import TextInput from "../widgets/TextInput";
+import { Linking, TextInput as NativeTextInput, View } from "react-native";
+import { Text } from "react-native-paper";
 
 import * as C from "../constants";
-import PasswordInput from "../widgets/PasswordInput";
-import FormButton from "../widgets/FormButton";
 import { validateServerUrl } from "../helpers";
+import { useTheme } from "../theme";
+import { AuthField, AuthInput, PasswordField, PrimaryButton, ServerBox } from "./Auth";
 
 interface FormErrors {
   username?: string;
@@ -22,27 +16,23 @@ interface FormErrors {
   server?: string;
 }
 
-// Can be used to force always showing advance, e.g. for genericMode
-const alwaysShowAdvanced = false;
-
 interface PropsType {
   onSubmit: (username: string, password: string, serviceApiUrl?: string) => void;
+  loading?: boolean;
 }
 
 export default function LoginForm(props: PropsType) {
+  const theme = useTheme();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [server, setServer] = React.useState("");
-  const [showAdvanced, setShowAdvanced] = React.useState(alwaysShowAdvanced);
   const [errors, setErrors] = React.useState<FormErrors>({});
 
-  const usernameRef = React.useRef<NativeTextInput>(null);
   const passwordRef = React.useRef<NativeTextInput>(null);
-  const serverRef = React.useRef<NativeTextInput>(null);
 
   function onSubmit() {
     // The default server is used when it's left empty
-    const serverUrl = (showAdvanced && server.trim()) ? server.trim() : undefined;
+    const serverUrl = server.trim() || undefined;
 
     const errors: FormErrors = {};
     const fieldRequired = "This field is required!";
@@ -70,99 +60,44 @@ export default function LoginForm(props: PropsType) {
 
   return (
     <>
-      <View>
-        <TextInput
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="username"
-          autoFocus
-          returnKeyType="next"
-          onSubmitEditing={() => (passwordRef.current)!.focus()}
-          ref={usernameRef}
-          error={!!errors.username}
-          onChangeText={setUsername}
-          label="Username"
-          accessibilityLabel="Username"
-          value={username}
-        />
-        <HelperText
-          type="error"
-          visible={!!errors.username}
-        >
-          {errors.username}
-        </HelperText>
-
-        <PasswordInput
-          autoComplete="password"
-          returnKeyType={showAdvanced ? "next" : undefined}
-          onSubmitEditing={() => serverRef.current?.focus()}
-          ref={passwordRef}
-          error={!!errors.password}
+      <ServerBox verb="Logging in to" value={server} onChange={setServer} error={errors.server} />
+      <View style={{ gap: 16 }}>
+        <AuthField label="Username" error={errors.username}>
+          <AuthInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="username"
+            autoFocus
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            invalid={!!errors.username}
+            onChangeText={setUsername}
+            accessibilityLabel="Username"
+            value={username}
+          />
+        </AuthField>
+        <AuthField
           label="Password"
-          accessibilityLabel="Password"
-          value={password}
-          onChangeText={setPassword}
-        />
-        <HelperText
-          type="error"
-          visible={!!errors.password}
+          error={errors.password}
+          right={(!C.genericMode) && (
+            <Text accessibilityRole="link" onPress={() => Linking.openURL(C.forgotPassword)} style={{ fontSize: 13, color: theme.colors.accentText }}>
+              Forgot password?
+            </Text>
+          )}
         >
-          {errors.password}
-        </HelperText>
-        {!C.genericMode && (
-          <>
-            <LinkButton to={C.forgotPassword} external>
-              Forget password?
-            </LinkButton>
-          </>
-        )}
-
-        <TouchableRipple
-          onPress={() => setShowAdvanced(!showAdvanced)}
-        >
-          <Row style={{ paddingVertical: 8, justifyContent: "space-between" }}>
-            <Paragraph>Advanced settings</Paragraph>
-            <View pointerEvents="none">
-              <Switch value={showAdvanced} />
-            </View>
-          </Row>
-        </TouchableRipple>
-
-        {showAdvanced && (
-          <>
-            <TextInput
-              keyboardType="url"
-              textContentType="URL"
-              autoCapitalize="none"
-              autoCorrect={false}
-              error={!!errors.server}
-              label="Server URL"
-              accessibilityLabel="Server URL"
-              value={server}
-              placeholder="E.g. https://api.etebase.com"
-              onChangeText={setServer}
-              ref={serverRef}
-            />
-            <HelperText
-              type="error"
-              visible={!!errors.server}
-            >
-              {errors.server}
-            </HelperText>
-          </>
-        )}
-        <HelperText
-          type="error"
-          visible={false}
-        >
-          <React.Fragment />
-        </HelperText>
-
-        <FormButton
-          onPress={onSubmit}
-        >
-          Log In
-        </FormButton>
+          <PasswordField
+            ref={passwordRef}
+            autoComplete="current-password"
+            invalid={!!errors.password}
+            accessibilityLabel="Password"
+            value={password}
+            onChangeText={setPassword}
+            onSubmitEditing={onSubmit}
+          />
+        </AuthField>
+        <View style={{ marginTop: 6 }}>
+          <PrimaryButton label="Log in" onPress={onSubmit} loading={props.loading} />
+        </View>
       </View>
     </>
   );

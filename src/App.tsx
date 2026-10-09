@@ -99,7 +99,7 @@ function InnerApp() {
         <SettingsGate>
           <NavigationContainer linking={linking}>
             <DrawerNavigation.Navigator
-              drawerContent={({ navigation }) => <Drawer navigation={navigation} />}
+              drawerContent={({ navigation, state }) => <Drawer navigation={navigation} state={state} />}
               screenOptions={{
                 headerShown: false,
                 drawerStyle: initRender ? { width: 0 } : undefined,

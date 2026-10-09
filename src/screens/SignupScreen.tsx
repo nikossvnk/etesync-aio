@@ -5,26 +5,21 @@ import * as React from "react";
 
 import * as Etebase from "etebase";
 
-import { View, TextInput as NativeTextInput } from "react-native";
-import { Switch, Text, HelperText, Paragraph, TouchableRipple } from "react-native-paper";
+import { Linking, Platform, View, TextInput as NativeTextInput } from "react-native";
+import { Text, TouchableRipple } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { Headline } from "../widgets/Typography";
-import ScrollView from "../widgets/ScrollView";
-import Container from "../widgets/Container";
-import TextInput from "../widgets/TextInput";
-import PasswordInput from "../widgets/PasswordInput";
-import Alert from "../widgets/Alert";
-import Row from "../widgets/Row";
-import FormButton from "../widgets/FormButton";
+import { AuthField, AuthHeading, AuthInput, AuthLayout, ErrorBox, PasswordField, PrimaryButton, ServerBox } from "../components/Auth";
+import { fonts, useTheme } from "../theme";
+import { tint } from "../pim/TimeGrid";
 
 import { useAsyncDispatch } from "../store";
 
 import { login } from "../store/actions";
-import { enforcePasswordRules, validateServerUrl } from "../helpers";
+import { enforcePasswordRules, PASSWORD_MIN_LENGTH, validateServerUrl } from "../helpers";
 
 import * as C from "../constants";
 import { useCredentials } from "../credentials";
-import LinkButton from "../widgets/LinkButton";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../RootStackParamList";
@@ -40,8 +35,12 @@ interface FormErrors {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "Signup">;
 
-// Can be used to force always showing advance, e.g. for genericMode
-const alwaysShowAdvanced = false;
+// How strong a password looks, by its length (the rules only ask for 8 characters)
+function strength(password: string) {
+  const len = password.length;
+  const level = (len === 0) ? 0 : (len < 8) ? 1 : (len < 12) ? 2 : 3;
+  return { level, label: ["", "Too short", "Okay", "Strong"][level], color: ["", "#F09A5C", "#E0B43C", "#5CC59B"][level] };
+}
 
 export default React.memo(function SignupScreen() {
   const etebase = useCredentials();
@@ -51,18 +50,18 @@ export default React.memo(function SignupScreen() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [server, setServer] = React.useState("");
-  const [showAdvanced, setShowAdvanced] = React.useState(alwaysShowAdvanced);
+  // That the password can't be recovered was understood (signing up needs it)
+  const [understood, setUnderstood] = React.useState(false);
+  const theme = useTheme();
   const [loading, setLoading] = React.useState(false);
   const [errors, setErrors] = React.useState<FormErrors>({});
 
-  const usernameRef = React.useRef<NativeTextInput>(null);
   const emailRef = React.useRef<NativeTextInput>(null);
   const passwordRef = React.useRef<NativeTextInput>(null);
-  const serverRef = React.useRef<NativeTextInput>(null);
 
   async function onSubmit() {
     // The default server is used when it's left empty
-    const serverUrl = (showAdvanced && server.trim()) ? server.trim() : undefined;
+    const serverUrl = server.trim() || undefined;
 
     const errors: FormErrors = {};
     const fieldRequired = "This field is required!";
@@ -136,145 +135,104 @@ export default React.memo(function SignupScreen() {
     return <React.Fragment />;
   }
 
-  return (
-    <ScrollView keyboardAware>
-      <Container>
-        <Headline>Signup</Headline>
-        <View style={{ alignItems: "center", flexDirection: "row" }}>
-          <Text> or </Text><LinkButton to="/login">log in to your account</LinkButton>
-        </View>
+  const pw = strength(password);
 
-        <Alert
-          style={{ marginTop: 10 }}
-          severity="info"
-          to={C.pricing}
-          external
+  return (
+    <AuthLayout>
+      <AuthHeading
+        title="Create an account"
+        question="Already have one?"
+        linkLabel="Log in"
+        onLink={() => navigation.navigate("Login")}
+      />
+      {(!C.genericMode) && (
+        <TouchableRipple
+          accessibilityRole="link"
+          accessibilityLabel="You're starting a free trial on this server. See pricing"
+          onPress={() => Linking.openURL(C.pricing)}
+          style={{ borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: theme.colors.accentTint }}
         >
-          You are signing up for a free trial. Click here for pricing information.
-        </Alert>
-        <View>
-          <TextInput
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <MaterialCommunityIcons name="information-outline" size={18} color={theme.colors.accent} />
+            <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textBody }}>
+              You’re starting a free trial on this server. <Text style={{ color: theme.colors.accentText, fontFamily: fonts.medium }}>See pricing ↗</Text>
+            </Text>
+          </View>
+        </TouchableRipple>
+      )}
+      {(errors.general) && <ErrorBox message={errors.general} />}
+      <ServerBox verb="Creating your account on" value={server} onChange={setServer} error={errors.server} />
+      <View style={{ gap: 16 }}>
+        <AuthField label="Username" error={errors.username}>
+          <AuthInput
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="username"
             autoFocus
             returnKeyType="next"
-            onSubmitEditing={() => emailRef.current!.focus()}
-            ref={usernameRef}
-            error={!!errors.username}
+            onSubmitEditing={() => emailRef.current?.focus()}
+            invalid={!!errors.username}
             onChangeText={setUsername}
-            label="Username"
             accessibilityLabel="Username"
             value={username}
           />
-          <HelperText
-            type="error"
-            visible={!!errors.username}
-          >
-            {errors.username}
-          </HelperText>
-
-          <TextInput
-            autoCapitalize="none"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoCorrect={false}
-            returnKeyType="next"
-            onSubmitEditing={() => passwordRef.current!.focus()}
+        </AuthField>
+        <AuthField label="Email address" error={errors.email}>
+          <AuthInput
             ref={emailRef}
-            error={!!errors.email}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            keyboardType="email-address"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            invalid={!!errors.email}
             onChangeText={setEmail}
-            label="Email address"
-            accessibilityLabel="Email address"
+            accessibilityLabel="Email"
             value={email}
           />
-          <HelperText
-            type="error"
-            visible={!!errors.email}
-          >
-            {errors.email}
-          </HelperText>
-
-
-          <PasswordInput
-            autoComplete="password"
-            returnKeyType={showAdvanced ? "next" : undefined}
-            onSubmitEditing={() => serverRef.current?.focus()}
-            ref={passwordRef}
-            error={!!errors.password}
-            label="Password"
-            accessibilityLabel="Password"
-            value={password}
-            onChangeText={setPassword}
-          />
-          <HelperText
-            type="error"
-            visible={!!errors.password}
-          >
-            {errors.password}
-          </HelperText>
-
-          <TouchableRipple
-            onPress={() => setShowAdvanced(!showAdvanced)}
-          >
-            <Row style={{ paddingVertical: 8, justifyContent: "space-between" }}>
-              <Paragraph>Advanced settings</Paragraph>
-              <View pointerEvents="none">
-                <Switch value={showAdvanced} />
-              </View>
-            </Row>
-          </TouchableRipple>
-
-          {showAdvanced && (
-            <>
-              <TextInput
-                keyboardType="url"
-                textContentType="URL"
-                autoCapitalize="none"
-                autoCorrect={false}
-                error={!!errors.server}
-                label="Server URL"
-                accessibilityLabel="Server URL"
-                value={server}
-                placeholder="E.g. https://api.etebase.com"
-                onChangeText={setServer}
-                ref={serverRef}
-              />
-              <HelperText
-                type="error"
-                visible={!!errors.server}
-              >
-                {errors.server}
-              </HelperText>
-            </>
-          )}
-          <HelperText
-            type="error"
-            visible={false}
-          >
-            <React.Fragment />
-          </HelperText>
-
-          {errors.general && (
-            <Alert severity="error" style={{ marginBottom: 10 }}>{errors.general}</Alert>
-          )}
-
-          <Alert
-            style={{ marginBottom: 10 }}
-            severity="warning"
-          >
-            Please make sure you remember your password, as it can't be recovered if lost!
-          </Alert>
-
-          <FormButton
-            onPress={onSubmit}
-            disabled={loading}
-            loading={loading}
-          >
-            Signup
-          </FormButton>
+        </AuthField>
+        <View style={{ gap: 8 }}>
+          <AuthField label="Password" error={errors.password}>
+            <PasswordField
+              ref={passwordRef}
+              autoComplete={(Platform.OS === "web") ? "new-password" as any : "password-new"}
+              invalid={!!errors.password}
+              accessibilityLabel="Password"
+              value={password}
+              onChangeText={setPassword}
+            />
+          </AuthField>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }} accessibilityLabel={(pw.label) ? `Password strength: ${pw.label}` : undefined}>
+            <View style={{ flex: 1, flexDirection: "row", gap: 4 }}>
+              {[1, 2, 3].map((x) => (
+                <View key={x} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: (pw.level >= x) ? pw.color : theme.colors.field }} />
+              ))}
+            </View>
+            <Text style={{ minWidth: 64, textAlign: "right", fontSize: 12, fontFamily: fonts.medium, color: pw.color || theme.colors.textMuted }}>{pw.label}</Text>
+          </View>
+          <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
+            At least {PASSWORD_MIN_LENGTH} characters. A few random words make a password that’s strong and easy to remember.
+          </Text>
         </View>
-      </Container>
-    </ScrollView>
+        <TouchableRipple
+          accessibilityRole="checkbox"
+          accessibilityLabel="I understand my password can't be recovered"
+          accessibilityState={{ checked: understood }}
+          aria-checked={understood}
+          onPress={() => setUnderstood(!understood)}
+          style={{ borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12,
+            backgroundColor: tint("#F09A5C", 0.1), borderColor: tint("#F09A5C", 0.4) }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+            <MaterialCommunityIcons name={(understood) ? "checkbox-marked" : "checkbox-blank-outline"} size={20} color="#E0864A" />
+            <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textBody }}>
+              <Text style={{ fontFamily: fonts.semibold }}>I understand my password can’t be recovered.</Text> It encrypts my data, so if I lose it, nobody can reset it or restore my data.
+            </Text>
+          </View>
+        </TouchableRipple>
+        <PrimaryButton label="Create account" onPress={onSubmit} disabled={!understood} loading={loading} />
+      </View>
+    </AuthLayout>
   );
 });

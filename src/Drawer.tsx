@@ -3,21 +3,21 @@
 
 import * as React from "react";
 import { useSelector } from "react-redux";
-import { DrawerNavigationProp } from "@react-navigation/drawer";
-import { Image, Linking, View, StatusBar, StyleSheet } from "react-native";
+import { DrawerNavigationProp, useDrawerStatus } from "@react-navigation/drawer";
+import { Linking, View, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Divider, Drawer as PaperDrawer, Text, Paragraph } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Text, Paragraph, TouchableRipple } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StoreState } from "./store";
 
 import ScrollView from "./widgets/ScrollView";
 import ConfirmationDialog from "./widgets/ConfirmationDialog";
 import PrettyFingerprint from "./widgets/PrettyFingerprint";
-import Container from "./widgets/Container";
-import DrawerItem from "./widgets/DrawerItem";
 
 import LogoutDialog from "./components/LogoutDialog";
+import { helpLinks, Logo } from "./components/Auth";
+import { expo } from "../app.json";
 
 import * as C from "./constants";
 import { useCredentials } from "./credentials";
@@ -31,15 +31,6 @@ type MenuItem = {
   icon: string;
   link: string;
 };
-
-const menuItems: MenuItem[] = [
-  {
-    title: "Settings",
-    path: "Settings",
-    icon: "cog",
-    link: "/settings",
-  },
-];
 
 // The calendar, the tasks and the contacts, which are next to the notes
 export const pimMenuItems: MenuItem[] = [
@@ -124,6 +115,41 @@ export function FingerprintDialog(props: { visible: boolean, onDismiss: () => vo
 
 interface PropsType {
   navigation: any;
+  // The state of the drawer, to show which screen is open
+  state?: any;
+}
+
+// The screen that is open in the stack of screens (inside of the drawer)
+function currentScreen(state: any): string | undefined {
+  const stack = state?.routes?.[0]?.state;
+  if (!stack?.routes) {
+    return undefined;
+  }
+  return stack.routes[stack.index ?? (stack.routes.length - 1)]?.name;
+}
+
+function Item(props: { label: string, icon: string, onPress: () => void, active?: boolean, disabled?: boolean, external?: boolean }) {
+  const theme = useTheme();
+  return (
+    <TouchableRipple
+      accessibilityRole={(props.external) ? "link" : "button"}
+      accessibilityLabel={props.label}
+      accessibilityState={{ selected: !!props.active, disabled: !!props.disabled }}
+      aria-current={(props.active) ? "page" : undefined}
+      disabled={props.disabled}
+      onPress={props.onPress}
+      style={[styles.item, (props.active) ? { backgroundColor: theme.colors.field } : undefined]}
+    >
+      <View style={styles.itemInner}>
+        <MaterialCommunityIcons name={props.icon as any} size={20} color={(props.disabled) ? theme.colors.disabled : (props.active) ? theme.colors.accent : theme.colors.textSecondary} />
+        <Text style={[styles.itemLabel, { color: (props.disabled) ? theme.colors.disabled : (props.active) ? theme.colors.text : theme.colors.textBody },
+          (props.active) ? { fontFamily: fonts.semibold } : undefined]}>
+          {props.label}
+        </Text>
+        {props.external && <MaterialCommunityIcons name="arrow-top-right" size={15} color={theme.colors.textMuted} />}
+      </View>
+    </TouchableRipple>
+  );
 }
 
 export default function Drawer(props: PropsType) {
@@ -134,125 +160,74 @@ export default function Drawer(props: PropsType) {
   const loggedIn = !!etebase;
   const syncCount = useSelector((state: StoreState) => state.syncCount);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const current = currentScreen(props.state);
+  // A closed drawer has nothing in it, so that its items (e.g. "Log in") aren't found next to the
+  // screen's own ones, e.g. by screen readers
+  const open = useDrawerStatus() === "open";
+
+  function go(screen: string, params?: any) {
+    navigation.closeDrawer();
+    (navigation as any).navigate("Root", { screen, params });
+  }
+
+  const items: { label: string, icon: string, screen: string, also?: string[] }[] = (loggedIn) ? [
+    { label: "Notes", icon: "file-document-outline", screen: "Home", also: ["NoteEdit", "NoteCreate", "Search"] },
+    { label: "Notebooks", icon: "notebook-multiple", screen: "Notebooks", also: ["Collection"] },
+    ...pimMenuItems.map((x) => ({ label: x.title, icon: x.icon, screen: x.path })),
+    { label: "Settings", icon: "tune-variant", screen: "Settings" },
+  ] : [
+    { label: "Log in", icon: "login", screen: "Login" },
+    { label: "Create account", icon: "account-plus-outline", screen: "Signup" },
+    { label: "Settings", icon: "tune-variant", screen: "Settings" },
+  ];
+
+  if (!open) {
+    return <View style={{ flex: 1, backgroundColor: theme.colors.sidebar }} />;
+  }
 
   return (
     <>
-      <ScrollView style={{ flex: 1 }}>
-        <SafeAreaView style={{ backgroundColor: theme.colors.sidebar, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border }}>
-          <View style={{ height: StatusBar.currentHeight || 0 }} />
-          <Container style={{ backgroundColor: "transparent", paddingVertical: 18 }}>
-            <View style={styles.app}>
-              <Image style={styles.appIcon} source={require("./images/icon.png")} />
-              <Text style={[styles.appName, { color: theme.colors.textMuted }]}>{C.appName}</Text>
-            </View>
-            {etebase && (
-              <View style={styles.account}>
-                {/* The initials of the account */}
-                <View style={[styles.avatar, { backgroundColor: theme.colors.chipActive }]}>
-                  <Text style={[styles.avatarText, { color: theme.colors.onChipActive }]}>{etebase.user.username.slice(0, 2).toUpperCase()}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.username, { color: theme.colors.text }]} numberOfLines={1}>{etebase.user.username}</Text>
-                  {/* The server the account is on */}
-                  <View style={styles.server} accessibilityLabel={`Server: ${serverName(etebase.serverUrl)}`}>
-                    <MaterialCommunityIcons name="server" size={13} color={theme.colors.textMuted} style={{ marginRight: 5 }} />
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{serverName(etebase.serverUrl)}</Text>
-                  </View>
-                </View>
+      <ScrollView style={{ flex: 1, backgroundColor: theme.colors.sidebar }} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.header}>
+          <Logo size={40} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.appName, { color: theme.colors.text }]} numberOfLines={1}>{(etebase) ? etebase.user.username : C.appName}</Text>
+            {(etebase) ? (
+              <View style={styles.server} accessibilityLabel={`Server: ${serverName(etebase.serverUrl)}`}>
+                <MaterialCommunityIcons name="server" size={13} color={theme.colors.textMuted} style={{ marginRight: 5 }} />
+                <Text style={{ color: theme.colors.textMuted, fontSize: 13, flexShrink: 1 }} numberOfLines={1}>{serverName(etebase.serverUrl)}</Text>
               </View>
+            ) : (
+              <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>Not logged in</Text>
             )}
-          </Container>
-        </SafeAreaView>
+          </View>
+          <TouchableRipple borderless accessibilityRole="button" accessibilityLabel="Close menu" onPress={() => navigation.closeDrawer()} style={styles.close}>
+            <MaterialCommunityIcons name="close" size={22} color={theme.colors.textMuted} />
+          </TouchableRipple>
+        </View>
+
+        {items.map((x) => (
+          <Item key={x.screen} label={x.label} icon={x.icon} active={(current === x.screen) || !!x.also?.includes(current ?? "")} onPress={() => go(x.screen)} />
+        ))}
         {loggedIn && (
           <>
-            <DrawerItem
-              label="Notes"
-              to="/"
-              onPress={() => {
-                navigation.closeDrawer();
-                (navigation as any).navigate("Root", { screen: "Home", pop: true });
-              }}
-              icon="note-multiple"
-            />
-            <DrawerItem
-              label="Notebooks"
-              to="/notebooks"
-              onPress={() => {
-                navigation.closeDrawer();
-                (navigation as any).navigate("Root", { screen: "Notebooks" });
-              }}
-              icon="notebook-multiple"
-            />
-            {pimMenuItems.map((item) => (
-              <DrawerItem
-                key={item.path}
-                label={item.title}
-                to={item.link}
-                onPress={() => {
-                  navigation.closeDrawer();
-                  (navigation as any).navigate("Root", { screen: item.path });
-                }}
-                icon={item.icon}
-              />
-            ))}
-            <Divider />
+            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+            <Item label="Show Fingerprint" icon="fingerprint" onPress={() => setShowFingerprint(true)} />
+            <Item label="Invitations" icon="email-outline" active={current === "Invitations"} onPress={() => go("Invitations")} />
+            <Item label="Logout" icon="exit-to-app" disabled={syncCount > 0} onPress={() => setShowLogout(true)} />
           </>
         )}
-        <>
-          {menuItems.map((menuItem) => (
-            <DrawerItem
-              key={menuItem.title}
-              label={menuItem.title}
-              to={menuItem.link}
-              onPress={() => {
-                navigation.closeDrawer();
-                (navigation as any).navigate("Root", { screen: menuItem.path });
-              }}
-              icon={menuItem.icon}
-            />
-          ))}
-          {loggedIn && (
-            <>
-              <DrawerItem
-                label="Show Fingerprint"
-                onPress={() => {
-                  setShowFingerprint(true);
-                }}
-                icon="fingerprint"
-              />
-              <DrawerItem
-                label="Invitations"
-                to="/invitations"
-                onPress={() => {
-                  navigation.closeDrawer();
-                  (navigation as any).navigate("Root", { screen: "Invitations" });
-                }}
-                icon="email-outline"
-              />
-              <DrawerItem
-                label="Logout"
-                onPress={() => setShowLogout(true)}
-                disabled={syncCount > 0}
-                icon="exit-to-app"
-              />
-            </>
-          )}
-        </>
-        <Divider />
-        <PaperDrawer.Section title="External links">
-          {externalMenuItems.map((menuItem) => (
-            <DrawerItem
-              key={menuItem.title}
-              label={menuItem.title}
-              to={menuItem.link}
-              onPress={() => { Linking.openURL(menuItem.link) }}
-              icon={menuItem.icon}
-            />
-          ))}
-        </PaperDrawer.Section>
+
+        <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <Text style={[styles.section, { color: theme.colors.textMuted }]}>Help</Text>
+        {helpLinks.map((x) => (
+          <Item key={x.title} label={x.title} icon={x.icon} external onPress={() => Linking.openURL(x.link)} />
+        ))}
+        <Text style={[styles.version, { color: theme.colors.disabled }]}>Version {expo.version}</Text>
       </ScrollView>
 
-      <FingerprintDialog visible={showFingerprint} onDismiss={() => setShowFingerprint(false)} />
+      {loggedIn && <FingerprintDialog visible={showFingerprint} onDismiss={() => setShowFingerprint(false)} />}
       <LogoutDialog
         visible={showLogout}
         onDismiss={(loggedOut) => {
@@ -267,43 +242,67 @@ export default function Drawer(props: PropsType) {
 }
 
 const styles = StyleSheet.create({
-  app: {
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
-  },
-  appIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
+    gap: 12,
+    paddingLeft: 10,
+    paddingRight: 4,
+    paddingBottom: 16,
   },
   appName: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-  },
-  account: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  avatarText: {
     fontFamily: fonts.semibold,
-    fontSize: 13,
-  },
-  username: {
-    fontFamily: fonts.semibold,
-    fontSize: 15,
+    fontSize: 17,
   },
   server: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 1,
+  },
+  close: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  item: {
+    height: 48,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  itemInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  itemLabel: {
+    flex: 1,
+    fontSize: 15,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 8,
+    marginVertical: 10,
+  },
+  section: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+    paddingHorizontal: 14,
+    paddingTop: 2,
+    paddingBottom: 4,
+  },
+  version: {
+    marginTop: "auto",
+    paddingTop: 16,
+    paddingHorizontal: 14,
+    fontSize: 12,
   },
 });

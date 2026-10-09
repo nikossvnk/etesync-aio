@@ -24,7 +24,7 @@ themselves are not changed.
 | Tasks | Adding from the top, the tasks in Overdue, Today, Upcoming and No date, today's progress. Each shows its list, its subtasks, a flag when it's important, and when it's due. Next to them on wide screens the chosen task's details: due, repeat, list, priority, its subtasks to tick off and add, and its notes. Repeating tasks get their next time when done. An editor for all of it. |
 | Contacts | A to Z, by address book or group. A contact's details, with buttons to email, call, schedule an event with them (they're invited) and edit, and what's about them: the events with them (and their birthday), the notes and the open tasks that mention them. |
 | Collections | New calendars, task lists and address books. The wizard makes the missing ones for new accounts. |
-| Login, signup, account | The notes' screens, which do what the web app's do (the same Etebase calls and checks). |
+| Login, signup, account | Do what the web app's do (the same Etebase calls and checks). On wide screens a card under a bar with the help links and the settings, on phones the menu. The server is shown, and changed only when asked to. Signing up shows how strong the password is, and needs agreeing that it can't be recovered. |
 | Settings | One screen: the notes' settings, and "Calendar and Tasks" with the settings of the web app. The web app's dark mode setting is the notes' theme setting. |
 
 ## How it fits together

@@ -6,14 +6,14 @@ run(async () => {
   const b = await launch();
   const A = await session(b, "A");
   await A.p.goto(config.appUrl + "/"); await A.wait(4000);
-  await A.vis("text=Advanced settings").click(); await A.wait(500);
+  await A.vis('[aria-label="Change the server"]').click(); await A.wait(500);
   await A.vis('input[aria-label="Username"]').fill(config.username);
   await A.vis('input[aria-label="Password"]').fill(config.password);
   for (const [url, expected] of [["http://example.com", "Has to start with https"], ["example.com", "Must be a URL"], ["http://127.0.0.1.evil.com", "Has to start with https"]]) {
     await A.vis('input[aria-label="Server URL"]').fill(url);
     await A.btn(/^log in$/i).click(); await A.wait(1200);
     const t = await A.p.innerText("body");
-    check(`${url} is refused`, t.includes(expected) && t.includes("Please Log In"));
+    check(`${url} is refused`, t.includes(expected) && t.includes("New here?"));
   }
   await A.vis('input[aria-label="Server URL"]').fill(config.serverUrl);
   await A.btn(/^log in$/i).click(); await A.wait(8000);

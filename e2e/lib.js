@@ -161,14 +161,14 @@ exports.session = async (browser, tag, viewport = { width: 900, height: 700 }) =
   });
   const vis = (s) => p.locator(s + " >> visible=true").first();
   const btn = (re) => p.getByRole("button", { name: re }).locator("visible=true").first();
-  // The text of the page without the drawer (which ends with "Report issue")
-  const text = async () => (await p.innerText("body")).replace(/\s+/g, " ").split("Report issue")[1] || "";
+  // The text of the page (a closed drawer has nothing in it)
+  const text = async () => (await p.innerText("body")).replace(/\s+/g, " ");
   const wait = (ms) => p.waitForTimeout(ms);
   const s = { tag, ctx, p, vis, btn, text, wait };
 
   s.login = async () => {
     await p.goto(config.appUrl + "/"); await wait(4000);
-    await vis("text=Advanced settings").click(); await wait(500);
+    await vis('[aria-label="Change the server"]').click(); await wait(500);
     await vis('input[aria-label="Username"]').fill(config.username);
     await vis('input[aria-label="Password"]').fill(config.password);
     await vis('input[aria-label="Server URL"]').fill(config.serverUrl);

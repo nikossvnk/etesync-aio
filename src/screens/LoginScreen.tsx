@@ -5,14 +5,9 @@ import * as React from "react";
 
 import * as Etebase from "etebase";
 
-import { View } from "react-native";
-import { Text } from "react-native-paper";
 
-import { Headline } from "../widgets/Typography";
-import ScrollView from "../widgets/ScrollView";
-import Container from "../widgets/Container";
-import ErrorOrLoadingDialog from "../widgets/ErrorOrLoadingDialog";
 import LoginForm from "../components/LoginForm";
+import { AuthHeading, AuthLayout, ErrorBox } from "../components/Auth";
 
 import { useAsyncDispatch } from "../store";
 
@@ -21,7 +16,6 @@ import { useLoading } from "../helpers";
 
 import * as C from "../constants";
 import { useCredentials } from "../credentials";
-import LinkButton from "../widgets/LinkButton";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../RootStackParamList";
@@ -47,24 +41,16 @@ const LoginScreen = React.memo(function _LoginScreen() {
   }
 
   return (
-    <ScrollView keyboardAware>
-      <Container>
-        <Headline>Please Log In</Headline>
-        {!C.genericMode && (
-          <View style={{ alignItems: "center", flexDirection: "row" }}>
-            <Text> or </Text><LinkButton to="/signup">create an account</LinkButton>
-          </View>
-        )}
-        <LoginForm
-          onSubmit={onFormSubmit}
-        />
-        <ErrorOrLoadingDialog
-          loading={loading}
-          error={error}
-          onDismiss={() => setPromise(undefined)}
-        />
-      </Container>
-    </ScrollView>
+    <AuthLayout>
+      <AuthHeading
+        title="Log in"
+        question={(C.genericMode) ? undefined : "New here?"}
+        linkLabel="Create an account"
+        onLink={() => navigation.navigate("Signup")}
+      />
+      {(error) && <ErrorBox message={error.message} />}
+      <LoginForm onSubmit={onFormSubmit} loading={loading} />
+    </AuthLayout>
   );
 });
 

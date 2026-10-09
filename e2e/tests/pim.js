@@ -67,7 +67,7 @@ run(async () => {
 
   // Logging in to a new account opens the wizard
   await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis("text=Advanced settings").click(); await wait(500);
+  await vis('[aria-label="Change the server"]').click(); await wait(500);
   await vis('input[aria-label="Username"]').fill(username);
   await vis('input[aria-label="Password"]').fill(password);
   await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
@@ -347,7 +347,7 @@ run(async () => {
   // Phones: the drawer has them too
   const B = await session(b, "B", { width: 420, height: 800 });
   await B.p.goto(config.appUrl + "/"); await B.wait(4000);
-  await B.vis("text=Advanced settings").click(); await B.wait(500);
+  await B.vis('[aria-label="Change the server"]').click(); await B.wait(500);
   await B.vis('input[aria-label="Username"]').fill(username);
   await B.vis('input[aria-label="Password"]').fill(password);
   await B.vis('input[aria-label="Server URL"]').fill(config.serverUrl);

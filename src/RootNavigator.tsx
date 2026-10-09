@@ -117,9 +117,8 @@ export default React.memo(function RootNavigator() {
                   component={LoginScreen}
                   options={{
                     title: "Login",
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
+                    // (the screen has its own bar)
+                    headerShown: false,
                   }}
                 />
                 <Stack.Screen
@@ -127,9 +126,8 @@ export default React.memo(function RootNavigator() {
                   component={SignupScreen}
                   options={{
                     title: "Signup",
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
+                    // (the screen has its own bar)
+                    headerShown: false,
                   }}
                 />
               </>

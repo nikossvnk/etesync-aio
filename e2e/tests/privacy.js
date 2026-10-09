@@ -64,7 +64,7 @@ run(async () => {
   });
 
   await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis("text=Advanced settings").click(); await wait(500);
+  await vis('[aria-label="Change the server"]').click(); await wait(500);
   await vis('input[aria-label="Username"]').fill(username);
   await vis('input[aria-label="Password"]').fill(password);
   await vis('input[aria-label="Server URL"]').fill(config.serverUrl);

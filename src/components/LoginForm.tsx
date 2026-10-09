@@ -1,0 +1,169 @@
+// SPDX-FileCopyrightText: © 2019 EteSync Authors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import * as React from "react";
+
+import { View, TextInput as NativeTextInput } from "react-native";
+import { Switch, HelperText, Paragraph, TouchableRipple } from "react-native-paper";
+
+
+import LinkButton from "../widgets/LinkButton";
+import Row from "../widgets/Row";
+import TextInput from "../widgets/TextInput";
+
+import * as C from "../constants";
+import PasswordInput from "../widgets/PasswordInput";
+import FormButton from "../widgets/FormButton";
+import { validateServerUrl } from "../helpers";
+
+interface FormErrors {
+  username?: string;
+  password?: string;
+  server?: string;
+}
+
+// Can be used to force always showing advance, e.g. for genericMode
+const alwaysShowAdvanced = false;
+
+interface PropsType {
+  onSubmit: (username: string, password: string, serviceApiUrl?: string) => void;
+}
+
+export default function LoginForm(props: PropsType) {
+  const [username, setUsername] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [server, setServer] = React.useState("");
+  const [showAdvanced, setShowAdvanced] = React.useState(alwaysShowAdvanced);
+  const [errors, setErrors] = React.useState<FormErrors>({});
+
+  const usernameRef = React.useRef<NativeTextInput>(null);
+  const passwordRef = React.useRef<NativeTextInput>(null);
+  const serverRef = React.useRef<NativeTextInput>(null);
+
+  function onSubmit() {
+    // The default server is used when it's left empty
+    const serverUrl = (showAdvanced && server.trim()) ? server.trim() : undefined;
+
+    const errors: FormErrors = {};
+    const fieldRequired = "This field is required!";
+    if (!username) {
+      errors.username = fieldRequired;
+    } else if (username.includes("@")) {
+      errors.username = "Please use your username (not email)";
+    }
+    if (!password) {
+      errors.password = fieldRequired;
+    }
+
+    const serverError = (serverUrl) ? validateServerUrl(serverUrl) : undefined;
+    if (serverError) {
+      errors.server = serverError;
+    }
+
+    setErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
+    props.onSubmit(username, password, serverUrl);
+  }
+
+  return (
+    <>
+      <View>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="username"
+          autoFocus
+          returnKeyType="next"
+          onSubmitEditing={() => (passwordRef.current)!.focus()}
+          ref={usernameRef}
+          error={!!errors.username}
+          onChangeText={setUsername}
+          label="Username"
+          accessibilityLabel="Username"
+          value={username}
+        />
+        <HelperText
+          type="error"
+          visible={!!errors.username}
+        >
+          {errors.username}
+        </HelperText>
+
+        <PasswordInput
+          autoComplete="password"
+          returnKeyType={showAdvanced ? "next" : undefined}
+          onSubmitEditing={() => serverRef.current?.focus()}
+          ref={passwordRef}
+          error={!!errors.password}
+          label="Password"
+          accessibilityLabel="Password"
+          value={password}
+          onChangeText={setPassword}
+        />
+        <HelperText
+          type="error"
+          visible={!!errors.password}
+        >
+          {errors.password}
+        </HelperText>
+        {!C.genericMode && (
+          <>
+            <LinkButton to={C.forgotPassword} external>
+              Forget password?
+            </LinkButton>
+          </>
+        )}
+
+        <TouchableRipple
+          onPress={() => setShowAdvanced(!showAdvanced)}
+        >
+          <Row style={{ paddingVertical: 8, justifyContent: "space-between" }}>
+            <Paragraph>Advanced settings</Paragraph>
+            <View pointerEvents="none">
+              <Switch value={showAdvanced} />
+            </View>
+          </Row>
+        </TouchableRipple>
+
+        {showAdvanced && (
+          <>
+            <TextInput
+              keyboardType="url"
+              textContentType="URL"
+              autoCapitalize="none"
+              autoCorrect={false}
+              error={!!errors.server}
+              label="Server URL"
+              accessibilityLabel="Server URL"
+              value={server}
+              placeholder="E.g. https://api.etebase.com"
+              onChangeText={setServer}
+              ref={serverRef}
+            />
+            <HelperText
+              type="error"
+              visible={!!errors.server}
+            >
+              {errors.server}
+            </HelperText>
+          </>
+        )}
+        <HelperText
+          type="error"
+          visible={false}
+        >
+          <React.Fragment />
+        </HelperText>
+
+        <FormButton
+          onPress={onSubmit}
+        >
+          Log In
+        </FormButton>
+      </View>
+    </>
+  );
+}

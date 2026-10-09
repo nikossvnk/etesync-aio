@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: © 2019 EteSync Authors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import * as React from "react";
+import { TextInput as PaperTextInput } from "react-native-paper";
+import { useTheme } from "../theme";
+
+export default React.memo(React.forwardRef(function PasswordInput(inProps: React.ComponentPropsWithoutRef<typeof PaperTextInput>, ref) {
+  const theme = useTheme();
+  const {
+    style,
+    ...props
+  } = inProps;
+
+  return (
+    <PaperTextInput
+      ref={ref as any}
+      style={[{ backgroundColor: "transparent" }, style]}
+      autoCorrect={false}
+      theme={{ colors: { primary: theme.colors.placeholder } }}
+      selectionColor={theme.colors.primary}
+      {...props}
+    />
+  );
+}));

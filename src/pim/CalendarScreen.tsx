@@ -1,0 +1,521 @@
+// SPDX-FileCopyrightText: © 2019 EteSync Authors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import * as React from "react";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { IconButton, Text, TouchableRipple } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { useDispatch, useSelector } from "react-redux";
+import * as ICAL from "ical.js";
+
+import { useCredentials } from "../credentials";
+import { useSyncGate } from "../SyncGate";
+import LoadingIndicator from "../widgets/LoadingIndicator";
+import { fonts, useTheme } from "../theme";
+import * as C from "../constants";
+import { StoreState } from "../store";
+import { pushMessage, setSettings } from "../store/actions";
+import { TaskType } from "./pim-types";
+import { savePimItem, usePimItems } from "./data";
+import { AccentButton, EmptyState, toDateString } from "./widgets";
+import { useDateFormats } from "./format";
+import TimeGrid, { mono, tint } from "./TimeGrid";
+import { addDays, Occurrence, onDay, sameDay, startOfDay, useOccurrences } from "./occurrences";
+import { Agenda, DayPanel, EventDetails, MiniMonth, panelStyle, SmallButton, TasksDue } from "./CalendarParts";
+import { setTaskDone } from "./TasksScreen";
+
+export type { Occurrence } from "./occurrences";
+
+type CalendarView = "month" | "week" | "day" | "agenda";
+const views: { key: CalendarView, label: string }[] = [
+  { key: "day", label: "Day" },
+  { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
+  { key: "agenda", label: "Agenda" },
+];
+
+// The weeks shown for a month, starting on the day the setting says (0 is Sunday)
+function monthGrid(month: Date, weekStart: number) {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const start = addDays(first, -((first.getDay() - weekStart + 7) % 7));
+  const days: Date[] = [];
+  for (let i = 0 ; i < 42 ; i++) {
+    days.push(addDays(start, i));
+  }
+  return days;
+}
+
+export default function CalendarScreen() {
+  const theme = useTheme();
+  const navigation = useNavigation<any>();
+  const dispatch = useDispatch();
+  const etebase = useCredentials()!;
+  const syncGate = useSyncGate();
+  const width = useWindowDimensions().width;
+  const wide = width >= 1100;
+  const fmt = useDateFormats();
+  const view = useSelector((state: StoreState) => state.settings.calendarView) ?? "month";
+  const showRepeating = useSelector((state: StoreState) => state.settings.showRepeating) ?? false;
+  const today = startOfDay(new Date());
+  const [month, setMonth] = React.useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selected, setSelected] = React.useState(today);
+  // The event chosen in the week view, whose details are shown next to it
+  const [selectedKey, setSelectedKey] = React.useState<string>();
+  const tasks = usePimItems(etebase, C.tasksType, TaskType.parse);
+
+  // The days the view shows
+  const days = React.useMemo(() => {
+    if (view === "week") {
+      const start = addDays(selected, -((selected.getDay() - fmt.weekStart + 7) % 7));
+      return [0, 1, 2, 3, 4, 5, 6].map((x) => addDays(start, x));
+    } else if (view === "day") {
+      return [selected];
+    }
+    return monthGrid(month, fmt.weekStart);
+  }, [view, month, selected, fmt]);
+  const miniDays = React.useMemo(() => monthGrid(selected, fmt.weekStart), [selected, fmt]);
+
+  // The events of all that is shown: the month (or the small one), what's coming up after the chosen
+  // day, and the four weeks of the agenda
+  const from = new Date(Math.min(days[0].getTime(), miniDays[0].getTime(), today.getTime()));
+  const to = new Date(Math.max(addDays(days[days.length - 1], 1).getTime(), addDays(miniDays[41], 1).getTime(),
+    addDays(today, 29).getTime(), addDays(selected, 60).getTime()));
+  const { occurrences, calendars } = useOccurrences(from, to);
+
+  if (syncGate) {
+    return syncGate;
+  }
+  if (!occurrences) {
+    return <LoadingIndicator />;
+  }
+  if (calendars.length === 0) {
+    return (
+      <EmptyState
+        icon="calendar-blank-outline"
+        title="No calendars yet"
+        text="Create a calendar to add events to it."
+        action={<AccentButton icon="plus" label="New calendar" onPress={() => navigation.navigate("PimCollectionCreate", { colType: C.calendarType })} />}
+      />
+    );
+  }
+
+  // Goes to the chosen day, and its month (so that the month view shows it when it's chosen)
+  function select(day: Date) {
+    setSelected(day);
+    setMonth(new Date(day.getFullYear(), day.getMonth(), 1));
+  }
+
+  function move(by: number) {
+    if (view === "month") {
+      setMonth(new Date(month.getFullYear(), month.getMonth() + by, 1));
+    } else {
+      select(addDays(selected, by * ((view === "week") ? 7 : 1)));
+    }
+  }
+
+  function setView(calendarView: CalendarView) {
+    dispatch(setSettings({ calendarView }) as any);
+  }
+
+  function newEvent(date?: Date, hour?: number) {
+    navigation.navigate("EventEdit", {
+      date: toDateString(date ?? selected),
+      ...((hour !== undefined) ? { time: `${String(hour).padStart(2, "0")}:00` } : {}),
+    });
+  }
+
+  // Events open in their editor, birthdays open their contact
+  function open(x: Occurrence) {
+    if (x.event) {
+      navigation.navigate("EventEdit", { colUid: x.event.collectionUid, itemUid: x.event.itemUid });
+    } else if (x.contact) {
+      navigation.navigate("Contact", { colUid: x.contact.collectionUid, itemUid: x.contact.itemUid });
+    }
+  }
+
+  // An event was dragged to another time: its start and end move by as much (for a repeating event,
+  // all of its times do)
+  async function changeTime(x: Occurrence, start: Date, end: Date) {
+    const event = x.event!.clone();
+    const shift = (before: Date, after: Date, time: ICAL.Time) => {
+      const ret = time.clone();
+      ret.addDuration(ICAL.Duration.fromSeconds(Math.round((after.getTime() - before.getTime()) / 1000)));
+      return ret;
+    };
+    const newStart = shift(x.start, start, event.startDate);
+    const newEnd = shift(x.end, end, event.endDate ?? event.startDate);
+    event.startDate = newStart;
+    event.endDate = newEnd;
+    event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
+    await savePimItem(etebase, event.collectionUid!, event);
+    setSelectedKey(undefined);
+    const when = `${(sameDay(start, x.start)) ? "" : fmt.day.format(start) + ", "}${fmt.time(start)} – ${fmt.time(end)}`;
+    dispatch(pushMessage({
+      message: (x.repeats) ? `All times of “${x.title}” were moved to ${fmt.time(start)} – ${fmt.time(end)}` : `“${x.title}” moved to ${when}`,
+      severity: "success",
+    }) as any);
+  }
+
+  const muted = (text: string | number, size?: number) => (
+    <Text style={[styles.titleMuted, { color: theme.colors.textMuted }, (size) ? { fontSize: size } : undefined]}>{text}</Text>
+  );
+  let title: React.ReactNode;
+  if (view === "agenda") {
+    title = <>Agenda {muted("from today · next 4 weeks", 15)}</>;
+  } else if (view === "day") {
+    title = <>{fmt.weekDayLong.format(selected)} {fmt.dayMonth.format(selected)} {muted(selected.getFullYear())}</>;
+  } else if (view === "week") {
+    const first = days[0];
+    const last = days[6];
+    const range = (first.getMonth() === last.getMonth()) ? `${first.getDate()} – ${fmt.dayMonth.format(last)}` : `${fmt.dayMonth.format(first)} – ${fmt.dayMonth.format(last)}`;
+    title = <>{range} {muted(last.getFullYear())}</>;
+  } else {
+    title = <>{fmt.monthName.format(month)} {muted(month.getFullYear())}</>;
+  }
+
+  const header = (
+    <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+      {(view !== "agenda") && (
+        <View style={{ flexDirection: "row" }}>
+          <IconButton icon="chevron-left" accessibilityLabel={`Previous ${view}`} iconColor={theme.colors.textSecondary} containerColor="transparent" onPress={() => move(-1)} style={styles.smallButton} />
+          <IconButton icon="chevron-right" accessibilityLabel={`Next ${view}`} iconColor={theme.colors.textSecondary} containerColor="transparent" onPress={() => move(1)} style={styles.smallButton} />
+        </View>
+      )}
+      <Text style={[styles.title, { color: theme.colors.text }]} testID="calendar-month" numberOfLines={1}>{title}</Text>
+      {(view !== "agenda") && (
+        <TouchableRipple
+          accessibilityRole="button"
+          accessibilityLabel="Today"
+          onPress={() => select(today)}
+          style={[styles.todayButton, { borderColor: theme.colors.border }]}
+        >
+          <Text style={{ color: theme.colors.text, fontSize: 13 }}>Today</Text>
+        </TouchableRipple>
+      )}
+      <View style={{ flex: 1 }} />
+      {(view === "agenda") && (
+        <TouchableRipple
+          accessibilityRole="checkbox"
+          accessibilityLabel="Show repeating events"
+          accessibilityState={{ checked: showRepeating }}
+          aria-checked={showRepeating}
+          onPress={() => dispatch(setSettings({ showRepeating: !showRepeating }) as any)}
+          style={styles.check}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <MaterialCommunityIcons name={(showRepeating) ? "checkbox-marked" : "checkbox-blank-outline"} size={18} color={(showRepeating) ? theme.colors.accent : theme.colors.textMuted} />
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Show repeating events</Text>
+          </View>
+        </TouchableRipple>
+      )}
+      <View style={[styles.switch, { borderColor: theme.colors.border, backgroundColor: theme.colors.sidebar }]}>
+        {views.map((x) => (
+          <TouchableRipple
+            key={x.key}
+            accessibilityRole="button"
+            accessibilityLabel={`${x.label} view`}
+            accessibilityState={{ selected: view === x.key }}
+            aria-selected={view === x.key}
+            onPress={() => setView(x.key)}
+            style={[styles.switchItem, (view === x.key) ? { backgroundColor: theme.colors.field } : undefined]}
+          >
+            <Text style={{ fontSize: 13, fontFamily: (view === x.key) ? fonts.medium : fonts.regular, color: (view === x.key) ? theme.colors.text : theme.colors.textMuted }}>
+              {x.label}
+            </Text>
+          </TouchableRipple>
+        ))}
+      </View>
+      <AccentButton icon="plus" label="New event" onPress={() => newEvent()} />
+    </View>
+  );
+
+  const side = (content: React.ReactNode, testID?: string) => (
+    <ScrollView
+      testID={testID}
+      style={[(wide) ? { width: 340, flexGrow: 0 } : undefined, (wide) ? panelStyle(theme) : undefined]}
+      contentContainerStyle={{ padding: 20, gap: 22 }}
+    >
+      {content}
+    </ScrollView>
+  );
+
+  if (view === "agenda") {
+    return (
+      <View style={{ flex: 1 }}>
+        {header}
+        <ScrollView style={{ flex: 1 }}>
+          <Agenda from={today} occurrences={occurrences} fmt={fmt} showRepeating={showRepeating} onEventPress={open} />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (view === "week" || view === "day") {
+    const selectedOccurrence = occurrences.find((x) => x.key === selectedKey);
+    const dayEvents = (view === "day") ? onDay(occurrences, selected) : [];
+    const dueTasks = (tasks ?? []).filter((t) => t.dueDate && sameDay(t.dueDate.toJSDate(), selected));
+    const grid = (
+      <TimeGrid
+        days={days}
+        occurrences={occurrences}
+        fmt={fmt}
+        detailed={view === "day"}
+        selectedKey={(view === "week" && wide) ? selectedKey : undefined}
+        onEventPress={(x) => {
+          if (view === "week" && wide) {
+            setSelectedKey(x.key);
+          } else {
+            open(x);
+          }
+        }}
+        onEventChange={changeTime}
+        onSlotPress={(start) => newEvent(start, start.getHours())}
+        onDayPress={(view === "week") ? (day) => {
+          select(day);
+          setView("day");
+        } : undefined}
+        overlay={(view === "day" && dayEvents.length === 0) ? (
+          <View style={[styles.free, { borderColor: theme.colors.border, backgroundColor: theme.colors.background, top: 9 * 48 }]}>
+            <Text style={{ color: theme.colors.textMuted, flex: 1 }}>Nothing scheduled — a free day.</Text>
+            <SmallButton label="Add event" onPress={() => newEvent()} />
+          </View>
+        ) : undefined}
+      />
+    );
+    return (
+      <View style={{ flex: 1 }}>
+        {header}
+        <View style={{ flex: 1, flexDirection: (wide) ? "row" : "column" }}>
+          <View style={{ flex: 1, minHeight: (wide) ? undefined : 480, paddingTop: 4 }}>{grid}</View>
+          {wide && (view === "week") && side(
+            <EventDetails x={selectedOccurrence} fmt={fmt} onEdit={open} onOpenContact={open} />,
+            "event-panel"
+          )}
+          {wide && (view === "day") && side(
+            <>
+              <MiniMonth selected={selected} days={miniDays} occurrences={occurrences} fmt={fmt} onPick={select} />
+              <TasksDue tasks={dueTasks} fmt={fmt} onToggle={(t) => setTaskDone(etebase, t, !t.finished)} onOpenTasks={() => navigation.navigate("Tasks")} />
+            </>,
+            "day-side"
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  // The month
+  const weekendColor = tint(theme.colors.text, (theme.dark) ? 0.012 : 0.02);
+  const dayColor = tint(theme.colors.text, (theme.dark) ? 0.04 : 0.035);
+  const panel = (
+    <DayPanel
+      day={selected}
+      occurrences={occurrences}
+      fmt={fmt}
+      onEventPress={open}
+      onAdd={() => newEvent()}
+      onDayPress={select}
+    />
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      {header}
+      <View style={{ flex: 1, flexDirection: (wide) ? "row" : "column" }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.grid}>
+          <View style={styles.week}>
+            {days.slice(0, 7).map((x) => (
+              <Text key={x.getDay()} style={[styles.weekDay, { color: theme.colors.textMuted }]}>{fmt.weekDay.format(x)}</Text>
+            ))}
+          </View>
+          {[0, 1, 2, 3, 4, 5].map((week) => (
+            <View key={week} style={styles.week}>
+              {days.slice(week * 7, week * 7 + 7).map((day) => {
+                const dayEvents = onDay(occurrences, day);
+                const inMonth = day.getMonth() === month.getMonth();
+                const weekend = (day.getDay() === 0) || (day.getDay() === 6);
+                const isSelected = day.getTime() === selected.getTime();
+                const isToday = day.getTime() === today.getTime();
+                const max = (wide) ? 3 : 2;
+                return (
+                  <TouchableRipple
+                    key={day.getTime()}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${fmt.day.format(day)}, ${dayEvents.length} events`}
+                    aria-selected={isSelected}
+                    onPress={() => setSelected(day)}
+                    onLongPress={() => {
+                      select(day);
+                      setView("day");
+                    }}
+                    style={[styles.day, { minHeight: (wide) ? 116 : 72, backgroundColor: (inMonth) ? ((weekend) ? weekendColor : dayColor) : "transparent",
+                      borderColor: (isSelected) ? theme.colors.accent : "transparent" }]}
+                  >
+                    <View style={{ gap: 3 }}>
+                      {(isToday) ? (
+                        <View style={[styles.todayNumber, { backgroundColor: theme.colors.accent }]}>
+                          <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: theme.colors.onAccent }}>{day.getDate()}</Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.dayNumber, { color: (inMonth) ? theme.colors.textSecondary : theme.colors.disabled }]}>{day.getDate()}</Text>
+                      )}
+                      {dayEvents.slice(0, max).map((x) => {
+                        if (x.allDay) {
+                          // Events of several days join from one day to the next
+                          const first = sameDay(x.start, day);
+                          const last = x.end <= addDays(day, 1);
+                          return (
+                            <View key={x.key} style={[styles.bar, { backgroundColor: tint(x.color, 0.26),
+                              borderTopLeftRadius: (first) ? 6 : 2, borderBottomLeftRadius: (first) ? 6 : 2,
+                              borderTopRightRadius: (last) ? 6 : 2, borderBottomRightRadius: (last) ? 6 : 2,
+                              opacity: (inMonth) ? 1 : 0.55 }]}>
+                              <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: fonts.medium, color: theme.colors.text }}>{x.title}</Text>
+                            </View>
+                          );
+                        }
+                        return (
+                          <View key={x.key} style={[styles.timed, { opacity: (inMonth) ? 1 : 0.55 }]}>
+                            <View style={[styles.eventDot, { backgroundColor: x.color }]} />
+                            {wide && <Text style={[styles.mono, { color: theme.colors.textMuted }]}>{fmt.time(x.start)}</Text>}
+                            <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: theme.colors.textBody }}>{x.title}</Text>
+                          </View>
+                        );
+                      })}
+                      {(dayEvents.length > max) && (
+                        <Text style={{ fontSize: 12, color: theme.colors.textMuted, paddingLeft: 4 }}>+{dayEvents.length - max} more</Text>
+                      )}
+                    </View>
+                  </TouchableRipple>
+                );
+              })}
+            </View>
+          ))}
+          {!wide && <View style={{ marginTop: 16 }}>{panel}</View>}
+        </ScrollView>
+        {wide && side(panel)}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  smallButton: {
+    margin: 0,
+  },
+  title: {
+    fontFamily: fonts.semibold,
+    fontSize: 22,
+    letterSpacing: -0.2,
+  },
+  titleMuted: {
+    fontFamily: fonts.regular,
+  },
+  todayButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 32,
+    justifyContent: "center",
+  },
+  check: {
+    height: 36,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  switch: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
+  switchItem: {
+    paddingHorizontal: 12,
+    height: 30,
+    justifyContent: "center",
+    borderRadius: 7,
+  },
+  grid: {
+    padding: 12,
+    paddingHorizontal: 16,
+    gap: 4,
+  },
+  week: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  weekDay: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  day: {
+    flex: 1,
+    minWidth: 0,
+    padding: 6,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    overflow: "hidden",
+  },
+  todayNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  dayNumber: {
+    height: 24,
+    paddingLeft: 4,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    lineHeight: 24,
+    marginBottom: 2,
+  },
+  bar: {
+    height: 20,
+    paddingHorizontal: 7,
+    justifyContent: "center",
+  },
+  timed: {
+    height: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 4,
+  },
+  eventDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  mono: {
+    fontSize: 11,
+    fontFamily: mono,
+  },
+  free: {
+    position: "absolute",
+    left: 80,
+    right: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 12,
+  },
+});

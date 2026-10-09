@@ -228,7 +228,9 @@ function CreateButton() {
 
 // The list under the sections, which is about the section that is open: the notebooks, the calendars
 // (to hide and show them), the task lists, or the address books and groups of contacts
-function SectionList(props: { section: Section, onPimScreen: boolean }) {
+// (inSection: the page is of the section, rather than e.g. the settings opened from it, where none
+// of the list is the chosen one)
+function SectionList(props: { section: Section, inSection: boolean, onPimScreen: boolean }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
@@ -301,10 +303,10 @@ function SectionList(props: { section: Section, onPimScreen: boolean }) {
     return (
       <>
         {header("Lists", "New task list", () => navigate("PimCollectionCreate", { colType: C.tasksType }))}
-        <Row label="All tasks" accessibilityLabel="All tasks" selected={!filter} onPress={() => choose(null)} count={open.length}
+        <Row label="All tasks" accessibilityLabel="All tasks" selected={props.inSection && !filter} onPress={() => choose(null)} count={open.length}
           left={<MaterialCommunityIcons name="format-list-checks" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
         {lists.map((x) => (
-          <Row key={x.colUid} label={x.name} accessibilityLabel={`List ${x.name}`} selected={filter === x.colUid} onPress={() => choose(x.colUid)}
+          <Row key={x.colUid} label={x.name} accessibilityLabel={`List ${x.name}`} selected={props.inSection && (filter === x.colUid)} onPress={() => choose(x.colUid)}
             count={open.filter((t) => t.collectionUid === x.colUid).length} left={colorBox(x.color)} />
         ))}
       </>
@@ -324,14 +326,14 @@ function SectionList(props: { section: Section, onPimScreen: boolean }) {
     return (
       <>
         {header((groups.length > 0) ? "Groups" : "Address books", "New address book", () => navigate("PimCollectionCreate", { colType: C.contactsType }))}
-        <Row label="All contacts" accessibilityLabel="All contacts" selected={!filter} onPress={() => choose(null)} count={people.length}
+        <Row label="All contacts" accessibilityLabel="All contacts" selected={props.inSection && !filter} onPress={() => choose(null)} count={people.length}
           left={<MaterialCommunityIcons name="account-multiple-outline" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
         {(books.length > 1) && books.map((x) => (
-          <Row key={x.colUid} label={x.name} accessibilityLabel={`Address book ${x.name}`} selected={filter === `book:${x.colUid}`}
+          <Row key={x.colUid} label={x.name} accessibilityLabel={`Address book ${x.name}`} selected={props.inSection && (filter === `book:${x.colUid}`)}
             onPress={() => choose(`book:${x.colUid}`)} count={people.filter((c) => c.collectionUid === x.colUid).length} left={colorBox(x.color)} />
         ))}
         {groups.map((x) => (
-          <Row key={x.uid} label={String(x.fn || "(no name)")} accessibilityLabel={`Group ${x.fn}`} selected={filter === `group:${x.uid}`}
+          <Row key={x.uid} label={String(x.fn || "(no name)")} accessibilityLabel={`Group ${x.fn}`} selected={props.inSection && (filter === `group:${x.uid}`)}
             onPress={() => choose(`group:${x.uid}`)} count={x.members.length}
             left={<MaterialCommunityIcons name="account-group-outline" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
         ))}
@@ -349,7 +351,7 @@ function SectionList(props: { section: Section, onPimScreen: boolean }) {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
   const total = notebooks.reduce((sum, x) => sum + x.count, 0);
-  const onNotes = !props.onPimScreen && (props.section === "notes");
+  const onNotes = props.inSection && !props.onPimScreen && (props.section === "notes");
   const show = (colUid: string | undefined) => {
     setQuery("");
     showNotebook(colUid);
@@ -395,6 +397,11 @@ export default function Sidebar() {
   const isSyncing = useSelector((state: StoreState) => state.syncCount) > 0;
   const section = sectionOf(currentScreen);
   const onPimScreen = section !== "notes";
+  // Pages of no section (e.g. the settings) keep the list of the section they were opened from
+  const lastSection = React.useRef<Section>("notes");
+  if (section !== "other") {
+    lastSection.current = section;
+  }
   // Where to go back to when the search is cleared (the screen, and which note or event it was of)
   const beforeSearch = React.useRef<{ name: string, params?: any }>({ name: "Home" });
 
@@ -479,7 +486,7 @@ export default function Sidebar() {
       <View style={[styles.divider, { backgroundColor: borderColor }]} />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.tree}>
-        <SectionList section={section} onPimScreen={onPimScreen} />
+        <SectionList section={(section === "other") ? lastSection.current : section} inSection={section !== "other"} onPimScreen={onPimScreen} />
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: borderColor }]}>

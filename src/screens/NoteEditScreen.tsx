@@ -8,7 +8,7 @@ import { Paragraph, Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { fonts, useTheme } from "../theme";
 import { useNavigation, RouteProp } from "@react-navigation/native";
-import { format } from "date-fns";
+import { useDateFormats } from "../pim/format";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -85,6 +85,7 @@ export default function NoteEditScreen(props: PropsType) {
   const navigation = useNavigation<NavigationProp>();
   const syncGate = useSyncGate();
   const theme = useTheme();
+  const fmt = useDateFormats();
   const wideLayout = useWideLayout();
 
   const cacheCollection = (colUid) ? cacheItems.get(colUid) : undefined;
@@ -400,7 +401,7 @@ export default function NoteEditScreen(props: PropsType) {
     <View style={styles.head}>
       <View style={styles.metaLine}>
         <NotebookPicker colUid={colUid} editable={!viewMode} onChange={changeNotebook} />
-        {!!mtime && <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>{"·  " + format(mtime, "PP")}</Text>}
+        {!!mtime && <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>{"·  " + fmt.mediumDate(new Date(mtime))}</Text>}
       </View>
       <NoteTitle
         editing={!viewMode}

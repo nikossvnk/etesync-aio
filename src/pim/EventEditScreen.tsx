@@ -22,7 +22,7 @@ import AppbarAction from "../widgets/AppbarAction";
 import { useTheme } from "../theme";
 import * as C from "../constants";
 import { EventType, timezoneLoadFromName } from "./pim-types";
-import { eventAttendees } from "./occurrences";
+import AttendeesField, { AttendeeEntry, attendeesOf, setAttendees } from "./AttendeesField";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
 import { TimezonePicker, timezoneName } from "./widgets";
 import { useDateFormats } from "./format";
@@ -75,6 +75,8 @@ export default function EventEditScreen(props: PropsType) {
   const [endTime, setEndTime] = React.useState(`${String(Math.min(startHour + 1, 23)).padStart(2, "0")}:${(startHour === 23) ? "59" : "00"}`);
   const [location, setLocation] = React.useState("");
   const [repeat, setRepeat] = React.useState<RepeatKey>("none");
+  // Who's invited (from a contact's "Schedule", they are)
+  const [attendees, setAttendeesState] = React.useState<AttendeeEntry[]>(() => (attendeeName) ? [{ name: attendeeName, email: attendeeEmail }] : []);
   // The time zone the times are in (the device's, unless the event is in another one)
   const [timezone, setTimezone] = React.useState(currentTimezone());
   const [description, setDescription] = React.useState("");
@@ -112,6 +114,7 @@ export default function EventEditScreen(props: PropsType) {
       setEndTime(toTimeString(end));
       setLocation(existing.location ?? "");
       setRepeat(repeatKeyOf(existing.isRecurring() ? existing.rrule : null));
+      setAttendeesState(attendeesOf(existing.component));
       setDescription(existing.description ?? "");
     } else {
       setCalendar(colUid ?? calendars[0]?.colUid);
@@ -180,11 +183,7 @@ export default function EventEditScreen(props: PropsType) {
     event.description = description;
     applyRepeat(event.component, repeat);
     event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
-    // Scheduled from a contact: they're invited
-    if (!existing && attendeeName) {
-      const attendee = event.component.addPropertyWithValue("attendee", (attendeeEmail) ? `mailto:${attendeeEmail}` : attendeeName);
-      attendee.setParameter("cn", attendeeName);
-    }
+    setAttendees(event.component, attendees);
 
     setSaving(true);
     try {
@@ -255,6 +254,13 @@ export default function EventEditScreen(props: PropsType) {
             })()}
           </Field>
         )}
+        {allDay && (
+          <Field label="Time zone">
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted }} testID="allday-timezone">
+              None: an all day event is on the same dates in every time zone (like a birthday), also when you travel.
+            </Text>
+          </Field>
+        )}
         <Field label="Repeat">
           <RepeatPicker value={repeat} onChange={setRepeat} />
         </Field>
@@ -263,13 +269,9 @@ export default function EventEditScreen(props: PropsType) {
             Changes to a repeating event change all of its times.
           </Text>
         )}
-        {(existing ? eventAttendees(existing).map((x) => x.name) : (attendeeName) ? [attendeeName] : []).length > 0 && (
-          <Field label="With">
-            <Text style={{ color: theme.colors.text }}>
-              {(existing ? eventAttendees(existing).map((x) => x.name) : [attendeeName]).join(", ")}
-            </Text>
-          </Field>
-        )}
+        <Field label="Attendees">
+          <AttendeesField value={attendees} onChange={setAttendeesState} />
+        </Field>
         <Field label="Location">
           <FieldInput value={location} onChangeText={setLocation} accessibilityLabel="Location" />
         </Field>

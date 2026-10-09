@@ -11,6 +11,7 @@ import RootNavigator from "./RootNavigator";
 
 import ErrorBoundary from "./ErrorBoundary";
 import Drawer from "./Drawer";
+import { useWebScrollbars } from "./webScrollbars";
 import SettingsGate from "./SettingsGate";
 
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -84,6 +85,7 @@ function InnerApp() {
   const darkModePreference = useSelector((state: StoreState) => state.settings.theme);
   const colorScheme = (darkModePreference === "auto") ? colorScheme_ : darkModePreference;
   const theme = (colorScheme === "dark") ? DarkTheme : LightTheme;
+  useWebScrollbars(theme);
   const wideLayout = useWideLayout();
   // The font of the app, which is part of it, so this is quick (and it falls back to the system's if it fails)
   const [fontsLoaded, fontsError] = useFonts({ IBMPlexSans_400Regular, IBMPlexSans_500Medium, IBMPlexSans_600SemiBold, IBMPlexSans_700Bold });

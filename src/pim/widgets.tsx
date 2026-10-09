@@ -4,7 +4,7 @@
 // Pieces the calendar, the tasks and the contacts share, in the style of the notes
 
 import * as React from "react";
-import { Platform, StyleSheet, TextInput as NativeTextInput, View, ViewStyle, StyleProp } from "react-native";
+import { StyleSheet, TextInput as NativeTextInput, View, ViewStyle, StyleProp } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ICAL from "ical.js";
@@ -13,6 +13,7 @@ import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
 import { fonts, useTheme } from "../theme";
 import { PimCollection } from "./data";
+import { DateFormats, useDateFormats } from "./format";
 import * as zoneData from "./data/zones.json";
 
 export function ColorDot(props: { color: string, size?: number, style?: StyleProp<ViewStyle> }) {
@@ -43,38 +44,185 @@ export function FieldInput(props: React.ComponentProps<typeof NativeTextInput>) 
   );
 }
 
-// A date ("YYYY-MM-DD") or a time ("HH:MM"). Browsers have their own pickers for them, the phones get
-// a text field.
+// Dates are kept as "YYYY-MM-DD" and times as "HH:MM", and shown and typed in the format of the date
+// and time setting (e.g. "09/10/2026" and "14:00", or "10/09/2026" and "2:00 PM")
+
+function isoOf(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dateOfIso(value: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return (m) ? new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])) : undefined;
+}
+
+// A typed date, in the order of the setting (or as "YYYY-MM-DD"); undefined if it isn't one
+export function parseTypedDate(text: string, fmt: DateFormats): string | undefined {
+  const t = text.trim();
+  if (dateOfIso(t)) {
+    return t;
+  }
+  const m = /^(\d{1,2})[/.\-\s](\d{1,2})[/.\-\s](\d{2}|\d{4})$/.exec(t);
+  if (!m) {
+    return undefined;
+  }
+  const [first, second] = [parseInt(m[1]), parseInt(m[2])];
+  const [day, month] = (fmt.locale === "en-us") ? [second, first] : [first, second];
+  const year = (m[3].length === 2) ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+  const date = new Date(year, month - 1, day);
+  // (e.g. 31/02 isn't a date)
+  return (date.getMonth() === month - 1 && date.getDate() === day) ? isoOf(date) : undefined;
+}
+
+// A typed time, e.g. "9", "9:30", "0930", "14:00" or "2:30 pm"; undefined if it isn't one
+export function parseTypedTime(text: string): string | undefined {
+  const m = /^(\d{1,2})(?::?(\d{2}))?\s*([ap])?\.?\s*m?\.?$/i.exec(text.trim());
+  if (!m) {
+    return undefined;
+  }
+  let hour = parseInt(m[1]);
+  const minute = (m[2]) ? parseInt(m[2]) : 0;
+  const half = m[3]?.toLowerCase();
+  if (half) {
+    if (hour < 1 || hour > 12) {
+      return undefined;
+    }
+    hour = (hour % 12) + ((half === "p") ? 12 : 0);
+  }
+  if (hour > 23 || minute > 59) {
+    return undefined;
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function showDate(value: string, fmt: DateFormats) {
+  const date = dateOfIso(value);
+  return (date) ? fmt.numericDate(date) : "";
+}
+
+function showTime(value: string, fmt: DateFormats) {
+  const m = /^(\d{2}):(\d{2})$/.exec(value);
+  return (m) ? fmt.time(new Date(2000, 0, 1, parseInt(m[1]), parseInt(m[2]))) : "";
+}
+
+// A small month to choose a date in
+function DatePickerGrid(props: { value: string, onPick: (value: string) => void, fmt: DateFormats }) {
+  const theme = useTheme();
+  const { fmt } = props;
+  const chosen = dateOfIso(props.value);
+  const [month, setMonth] = React.useState(() => {
+    const base = chosen ?? new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+  const first = new Date(month.getFullYear(), month.getMonth(), 1 - ((month.getDay() - fmt.weekStart + 7) % 7));
+  const days = Array.from(Array(42).keys()).map((i) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + i));
+  const today = isoOf(new Date());
+  return (
+    <View style={[styles.picker2, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]} testID="date-picker">
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableRipple borderless accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={styles.pickerNav}>
+          <MaterialCommunityIcons name="chevron-left" size={18} color={theme.colors.textSecondary} />
+        </TouchableRipple>
+        <Text style={{ flex: 1, textAlign: "center", fontFamily: fonts.semibold, color: theme.colors.text }}>{fmt.month.format(month)}</Text>
+        <TouchableRipple borderless accessibilityRole="button" accessibilityLabel="Next month" onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} style={styles.pickerNav}>
+          <MaterialCommunityIcons name="chevron-right" size={18} color={theme.colors.textSecondary} />
+        </TouchableRipple>
+      </View>
+      {[0, 1, 2, 3, 4, 5, 6].map((row) => (
+        <View key={row} style={{ flexDirection: "row" }}>
+          {(row === 0) ? days.slice(0, 7).map((d) => (
+            <Text key={d.getDay()} style={[styles.pickerCell, { fontSize: 11, color: theme.colors.textMuted }]}>{fmt.weekDay.format(d).slice(0, 2)}</Text>
+          )) : days.slice((row - 1) * 7, row * 7).map((d) => {
+            const iso = isoOf(d);
+            const isChosen = iso === props.value;
+            return (
+              <TouchableRipple
+                key={iso}
+                accessibilityRole="button"
+                accessibilityLabel={fmt.day.format(d)}
+                aria-selected={isChosen}
+                onPress={() => props.onPick(iso)}
+                style={[styles.pickerCell, styles.pickerDay, (isChosen) ? { backgroundColor: theme.colors.accent } : (iso === today) ? { borderWidth: 1, borderColor: theme.colors.accent } : undefined]}
+              >
+                <Text style={{ fontSize: 13, color: (isChosen) ? theme.colors.onAccent : (d.getMonth() === month.getMonth()) ? theme.colors.text : theme.colors.disabled }}>{d.getDate()}</Text>
+              </TouchableRipple>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// A date or a time field, in the format of the date and time setting. What's typed is taken once
+// it's a date (or time); a date can also be chosen in a small month.
 export function DateTimeInput(props: { mode: "date" | "time", value: string, onChange: (value: string) => void, accessibilityLabel: string, disabled?: boolean }) {
   const theme = useTheme();
-  if (Platform.OS === "web") {
-    return React.createElement("input", {
-      type: props.mode,
-      value: props.value,
-      disabled: props.disabled,
-      "aria-label": props.accessibilityLabel,
-      onChange: (e: any) => props.onChange(e.target.value),
-      style: {
-        fontFamily: fonts.regular,
-        fontSize: 14,
-        color: theme.colors.text,
-        backgroundColor: theme.colors.surface,
-        border: `1px solid ${theme.colors.border}`,
-        borderRadius: 10,
-        padding: "8px 10px",
-        colorScheme: (theme.dark) ? "dark" : "light",
-        opacity: (props.disabled) ? 0.5 : 1,
-      },
-    });
+  const fmt = useDateFormats();
+  const show = (props.mode === "date") ? showDate : showTime;
+  const [text, setText] = React.useState(() => show(props.value, fmt));
+  const [focused, setFocused] = React.useState(false);
+  const [picking, setPicking] = React.useState(false);
+  const parsed = (props.mode === "date") ? parseTypedDate(text, fmt) : parseTypedTime(text);
+  const invalid = !!text.trim() && !parsed;
+
+  // Changed from outside (or the setting changed): shown again, unless it's being typed in
+  React.useEffect(() => {
+    if (!focused) {
+      setText(show(props.value, fmt));
+    }
+  }, [props.value, fmt, focused]);
+
+  function change(t: string) {
+    setText(t);
+    const value = (props.mode === "date") ? parseTypedDate(t, fmt) : parseTypedTime(t);
+    if (value) {
+      props.onChange(value);
+    } else if (!t.trim()) {
+      props.onChange("");
+    }
   }
+
   return (
-    <FieldInput
-      value={props.value}
-      editable={!props.disabled}
-      onChangeText={props.onChange}
-      placeholder={(props.mode === "date") ? "YYYY-MM-DD" : "HH:MM"}
-      accessibilityLabel={props.accessibilityLabel}
-    />
+    <View>
+      <View>
+        <FieldInput
+          value={text}
+          editable={!props.disabled}
+          onChangeText={change}
+          onFocus={() => setFocused(true)}
+          // (a time or date that is typed in its own way is then shown in the format of the setting)
+          onBlur={() => setFocused(false)}
+          placeholder={(props.mode === "date") ? fmt.numericDatePattern : (fmt.twelveHours) ? "h:mm AM" : "HH:MM"}
+          accessibilityLabel={props.accessibilityLabel}
+          style={[(props.mode === "date") ? { paddingRight: 40 } : undefined, (invalid) ? { borderColor: theme.colors.error } : undefined,
+            (props.disabled) ? { opacity: 0.5 } : undefined]}
+        />
+        {(props.mode === "date") && (
+          <TouchableRipple
+            borderless
+            disabled={props.disabled}
+            accessibilityRole="button"
+            accessibilityLabel={`Choose the ${props.accessibilityLabel.toLowerCase()}`}
+            onPress={() => setPicking(!picking)}
+            style={styles.pickerButton}
+          >
+            <MaterialCommunityIcons name="calendar-month-outline" size={18} color={theme.colors.textMuted} />
+          </TouchableRipple>
+        )}
+      </View>
+      {picking && (
+        <DatePickerGrid
+          value={props.value}
+          fmt={fmt}
+          onPick={(value) => {
+            setPicking(false);
+            setText(showDate(value, fmt));
+            props.onChange(value);
+          }}
+        />
+      )}
+    </View>
   );
 }
 
@@ -270,6 +418,41 @@ const styles = StyleSheet.create({
   },
   accent: {
     borderRadius: 10,
+  },
+  pickerButton: {
+    position: "absolute",
+    right: 4,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  picker2: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 8,
+    gap: 2,
+    maxWidth: 300,
+  },
+  pickerNav: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerCell: {
+    flex: 1,
+    textAlign: "center",
+    paddingVertical: 4,
+  },
+  pickerDay: {
+    height: 34,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   zoneList: {
     marginTop: 4,

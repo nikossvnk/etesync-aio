@@ -1,5 +1,5 @@
 import * as React from "react";
-import { differenceInCalendarDays, format, isThisYear, isToday, isYesterday } from "date-fns";
+import { DateFormats, formatChanged, useDateFormats } from "../pim/format";
 import { FlatList, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -102,19 +102,10 @@ export function useNotePreview(itemMgr: Etebase.ItemManager | undefined, cache: 
   return preview;
 }
 
-// When a note was changed: the time today, then the day of the week, then the date
-export function shortDate(mtime: number) {
-  const now = new Date();
-  if (isToday(mtime)) {
-    return format(mtime, "p");
-  } else if (isYesterday(mtime)) {
-    return "Yesterday";
-  } else if (differenceInCalendarDays(now, mtime) < 7) {
-    return format(mtime, "EEE");
-  } else if (isThisYear(mtime)) {
-    return format(mtime, "MMM d");
-  }
-  return format(mtime, "MMM d, yyyy");
+// When a note was changed: the time today, then the day of the week, then the date (in the format of
+// the date and time setting)
+export function shortDate(mtime: number, fmt: DateFormats) {
+  return formatChanged(new Date(mtime), fmt);
 }
 
 interface NoteRowPropsType {
@@ -133,6 +124,7 @@ interface NoteRowPropsType {
 }
 
 const NoteRow = React.memo(function NoteRow(props: NoteRowPropsType) {
+  const fmt = useDateFormats();
   const { item, itemMgr, color, notebookName, first, last, selected, onSelect, onPressNote } = props;
   const key = `${item.colUid}/${item.uid}`;
   const theme = useTheme();
@@ -159,7 +151,7 @@ const NoteRow = React.memo(function NoteRow(props: NoteRowPropsType) {
           <View>
             <View style={styles.rowTop}>
               <Text style={[styles.rowTitle, { color: theme.colors.text }]} numberOfLines={1}>{item.meta.name || untitled}</Text>
-              {mtime && <Text style={[styles.rowSmall, { color: theme.colors.textMuted }]}>{shortDate(mtime)}</Text>}
+              {mtime && <Text style={[styles.rowSmall, { color: theme.colors.textMuted }]}>{shortDate(mtime, fmt)}</Text>}
             </View>
             {!!preview && (
               <Text style={[styles.rowPreview, { color: theme.colors.textSecondary }]} numberOfLines={2}>{preview}</Text>

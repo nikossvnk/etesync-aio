@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
+import { useDateFormats } from "../pim/format";
 import { FlatList, Platform, StyleSheet, View } from "react-native";
 import { Paragraph, Text, TouchableRipple } from "react-native-paper";
 import { useDispatch, useSelector } from "react-redux";
@@ -36,6 +37,7 @@ interface RowPropsType {
 }
 
 const NoteRow = React.memo(function NoteRow(props: RowPropsType) {
+  const fmt = useDateFormats();
   const { item, itemMgr, notebookName, color, selected, onOpen, snippet } = props;
   const theme = useTheme();
   const preview = useNotePreview(itemMgr, item.cache);
@@ -65,7 +67,7 @@ const NoteRow = React.memo(function NoteRow(props: RowPropsType) {
             <View style={styles.meta}>
               <View style={[styles.color, { backgroundColor: color }]} />
               <Text style={[styles.small, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                {notebookName}{(mtime) ? ` · ${shortDate(mtime)}` : ""}
+                {notebookName}{(mtime) ? ` · ${shortDate(mtime, fmt)}` : ""}
               </Text>
             </View>
           </View>

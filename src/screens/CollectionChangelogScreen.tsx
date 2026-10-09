@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { format } from "date-fns";
+import { useDateFormats } from "../pim/format";
 import { useSelector } from "react-redux";
 import { FlatList, View } from "react-native";
 import { Divider, Text, List } from "react-native-paper";
@@ -36,6 +36,7 @@ export default function CollectionChangelogScreen(props: PropsType) {
   const navigation = useNavigation<NavigationProp>();
   const syncGate = useSyncGate();
   const theme = useTheme();
+  const fmt = useDateFormats();
   const cachedCollections = useSelector((state: StoreState) => state.cache.collections);
   const cachedItems = useSelector((state: StoreState) => state.cache.items);
 
@@ -73,7 +74,7 @@ export default function CollectionChangelogScreen(props: PropsType) {
     const icon = (item.isDeleted) ? iconDeleted : iconChanged;
 
     const name = item.meta.name!;
-    const mtime = (item.meta.mtime) ? format(item.meta.mtime, "PPpp") : undefined;
+    const mtime = (item.meta.mtime) ? `${fmt.mediumDate(new Date(item.meta.mtime))}, ${fmt.timeSeconds(new Date(item.meta.mtime))}` : undefined;
 
     return (
       <List.Item

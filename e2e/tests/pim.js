@@ -52,6 +52,9 @@ async function addItem(etebase, col, content) {
 const pad = (x) => String(x).padStart(2, "0");
 const icalDate = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// Dates as the date fields show them, with the UK format (the default) and the US one
+const ukDate = (d) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+const usDate = (d) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
 
 run(async () => {
   const n = unique();
@@ -196,7 +199,42 @@ run(async () => {
   await vis('input[aria-label="Start time"]').fill("18:00");
   await vis('input[aria-label="End time"]').fill("19:00");
   await btn(/^repeat weekly$/i).click(); await wait(300);
+  // The date can be chosen in a small month
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  await btn(/^choose the start date$/i).click(); await wait(500);
+  if (tomorrow.getMonth() !== today.getMonth()) {
+    await p.locator('[data-testid="date-picker"] >> visible=true').getByRole("button", { name: "Next month" }).click(); await wait(300);
+  }
+  await p.locator('[data-testid="date-picker"] >> visible=true').getByRole("button", { name: new RegExp(`\\b${tomorrow.getDate()}\\b`) }).first().click(); await wait(500);
+  check("a date can be chosen in a small month, and is shown day first", (await vis('input[aria-label="Start date"]').inputValue()) === ukDate(tomorrow),
+    await vis('input[aria-label="Start date"]').inputValue());
+  await vis('input[aria-label="Start date"]').fill(ukDate(today)); await wait(300);
+  await vis('input[aria-label="End date"]').fill(ukDate(today)); await wait(300);
+  // All day events have no time zone, which the editor says
+  await p.getByRole("checkbox", { name: "All day", exact: true }).locator("visible=true").first().click(); await wait(300);
+  check("an all day event has no time zone, which is explained", (await p.locator('[data-testid="allday-timezone"] >> visible=true').count() === 1) &&
+    (await vis('input[aria-label="Time zone"]').count() === 0));
+  await p.getByRole("checkbox", { name: "All day", exact: true }).locator("visible=true").first().click(); await wait(300);
+  // Who's invited: a contact, chosen by a part of the name, and someone typed in
+  await vis('input[aria-label="Add an attendee"]').fill("Ada Love"); await wait(800);
+  await btn(new RegExp(`^Invite Ada Lovelace ${n}$`)).click(); await wait(300);
+  await vis('input[aria-label="Add an attendee"]').fill("Bob Example <bob@example.invalid>");
+  await vis('input[aria-label="Add an attendee"]').press("Enter"); await wait(300);
+  check("attendees are added in the editor", (await p.locator('[data-testid="attendees"] >> visible=true').innerText()).includes(`Ada Lovelace ${n}`) &&
+    (await p.locator('[data-testid="attendees"] >> visible=true').innerText()).includes("Bob Example"));
   await btn(/^save$/i).click(); await wait(3000);
+  check("and are on the server", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => {
+    const flat = c.replace(/\r\n /g, "");
+    return flat.includes(`SUMMARY:Yoga ${n}`) && flat.includes(`ATTENDEE;CN=Ada Lovelace ${n}:mailto:ada${n}@example.invalid`) &&
+      flat.includes("ATTENDEE;CN=Bob Example:mailto:bob@example.invalid");
+  }))), serverDetail(types.calendar)());
+  await p.getByRole("button", { name: `Event Yoga ${n}` }).locator("visible=true").first().click(); await wait(2000);
+  await btn(/^remove bob example$/i).click(); await wait(300);
+  await btn(/^save$/i).click(); await wait(3000);
+  check("and removed again", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => {
+    const flat = c.replace(/\r\n /g, "");
+    return flat.includes(`SUMMARY:Yoga ${n}`) && flat.includes(`CN=Ada Lovelace ${n}`) && !flat.includes("Bob Example");
+  }))), serverDetail(types.calendar)());
   check("an event can be made to repeat weekly", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
     x.contents.some((c) => c.includes(`SUMMARY:Yoga ${n}`) && c.includes("RRULE:FREQ=WEEKLY")))), serverDetail(types.calendar)());
   // The standup repeats with a rule the editor can't make, which is kept when it's changed
@@ -205,6 +243,9 @@ run(async () => {
   await btn(/^save$/i).click(); await wait(2500);
   check("and is kept when the event is saved", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
     x.contents.some((c) => c.includes(`SUMMARY:Standup ${n}`) && c.includes("RRULE:FREQ=WEEKLY;BYDAY=")))), serverDetail(types.calendar)());
+
+  check("the scroll bars are thin, in the colors of the theme", await p.evaluate(() => !!document.getElementById("app-scrollbars") &&
+    getComputedStyle(document.body).scrollbarWidth === "thin"));
 
   // The week and the day views
   const grid = p.locator('[data-testid="time-grid"] >> visible=true');
@@ -224,7 +265,7 @@ run(async () => {
   await grid.getByRole("button", { name: /^New event .* 15:00$/ }).nth((today.getDay() + 6) % 7).click(); await wait(2000);
   check("an event made from an hour starts then", (await vis('input[aria-label="Start time"]').inputValue()) === "15:00" &&
     (await vis('input[aria-label="End time"]').inputValue()) === "16:00" &&
-    (await vis('input[aria-label="Start date"]').inputValue()) === isoDate(today));
+    (await vis('input[aria-label="Start date"]').inputValue()) === ukDate(today));
   await vis('input[aria-label="Title"]').fill(`Week event ${n}`);
   await btn(/^save$/i).click(); await wait(3000);
   check("it's shown in the week", await grid.getByRole("button", { name: `Event Week event ${n}` }).count() === 1);
@@ -376,6 +417,19 @@ run(async () => {
   const firstDay = await p.getByText(/^(Mon|Sun)$/).first().innerText();
   check("with the US format weeks start on Sunday, also after reloading", firstDay === "Sun", firstDay);
   check("and times have AM and PM", await A.has("10:00 AM – 10:30 AM"), await A.text());
+  // The date and time fields too: month first, and AM and PM
+  await btn(/^new event$/i).click(); await wait(2000);
+  check("with the US format the date fields are month first, the times have AM and PM",
+    ((await vis('input[aria-label="Start date"]').inputValue()) === usDate(today)) && ((await vis('input[aria-label="Start time"]').inputValue()) === "9:00 AM"),
+    [await vis('input[aria-label="Start date"]').inputValue(), await vis('input[aria-label="Start time"]').inputValue()]);
+  await vis('input[aria-label="Title"]').fill(`US ${n}`);
+  await vis('input[aria-label="Start date"]').fill(usDate(tomorrow));
+  await vis('input[aria-label="End date"]').fill(usDate(tomorrow));
+  await vis('input[aria-label="Start time"]').fill("2:30 pm");
+  await vis('input[aria-label="End time"]').fill("3:30 pm");
+  await btn(/^save$/i).click(); await wait(3000);
+  check("and what's typed in them is read so", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
+    x.contents.some((c) => c.includes(`SUMMARY:US ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(tomorrow)}T143000`).test(c)))), serverDetail(types.calendar)());
 
   // The notes are still there, and work as before
   await sideRow("Notes").click(); await wait(2500);

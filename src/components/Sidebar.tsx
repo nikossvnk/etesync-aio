@@ -23,6 +23,9 @@ import * as C from "../constants";
 import { usePimCollections, usePimItems } from "../pim/data";
 import { ContactType, TaskType } from "../pim/pim-types";
 import { addDays, birthdaysColor, birthdaysUid, contactBirthday, startOfDay, useOccurrences } from "../pim/occurrences";
+import { CollectionInfo, Kind, kinds, useCollectionInfos } from "../pim/collections";
+import { CollectionMenu } from "../pim/CollectionsScreen";
+import { useDialogs } from "../pim/Dialogs";
 
 export { useSidebarShown } from "./WideLayout";
 
@@ -109,6 +112,26 @@ function Row(props: RowPropsType) {
   );
 }
 
+// A row with the ⋯ menu of its collection, which shows when the pointer is over it
+function WithMenu(props: React.PropsWithChildren<{ info?: CollectionInfo, extra?: (close: () => void) => React.ReactNode }>) {
+  const theme = useTheme();
+  const [hover, setHover] = React.useState(false);
+  if (!props.info) {
+    return <>{props.children}</>;
+  }
+  return (
+    <View
+      {...({ onPointerEnter: () => setHover(true), onPointerLeave: () => setHover(false) } as any)}
+      style={{ position: "relative" }}
+    >
+      {props.children}
+      <View style={[styles.rowMenu, { backgroundColor: theme.colors.sidebar, opacity: (hover) ? 1 : 0 }]} testID="row-menu">
+        <CollectionMenu info={props.info} extra={props.extra} />
+      </View>
+    </View>
+  );
+}
+
 // The account the app is logged in to, with a menu of what the drawer has on phones
 function Account() {
   const theme = useTheme();
@@ -176,7 +199,7 @@ function Account() {
   );
 }
 
-type Section = "notes" | "calendar" | "tasks" | "contacts" | "other";
+type Section = "notes" | "calendar" | "tasks" | "contacts" | "settings" | "other";
 
 // Which of the four sections a screen belongs to
 export function sectionOf(screen: string | undefined): Section {
@@ -188,7 +211,9 @@ export function sectionOf(screen: string | undefined): Section {
     return "tasks";
   } else if (["Contacts", "Contact", "ContactEdit"].includes(screen)) {
     return "contacts";
-  } else if (["Settings", "SearchAll", "PimCollectionCreate", "About", "Password", "DebugLogs", "Invitations"].includes(screen)) {
+  } else if (["Settings", "About", "Password", "DebugLogs", "Invitations", "Collections", "CollectionChangelog"].includes(screen)) {
+    return "settings";
+  } else if (["SearchAll"].includes(screen)) {
     return "other";
   }
   return "notes";
@@ -247,6 +272,9 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
   const contacts = usePimItems(etebase, C.contactsType, ContactType.parse);
   const searching = query.trim() !== "";
   const section = (props.section === "other") ? "notes" : props.section;
+  const dialogs = useDialogs();
+  const infos = useCollectionInfos(etebase);
+  const infoOf = (colUid: string) => infos.find((x) => x.colUid === colUid);
 
   const header = (title: string, addLabel: string, onAdd: () => void) => (
     <View style={styles.sectionHeader}>
@@ -254,6 +282,35 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
       <IconButton containerColor="transparent" iconColor={theme.colors.textMuted} icon="plus" size={16} style={styles.smallButton} accessibilityLabel={addLabel} onPress={onAdd} />
     </View>
   );
+  // The way to all of the collections of the section, at the end of its list
+  const manage = (kind: Kind) => (
+    <TouchableRipple accessibilityRole="link" accessibilityLabel={kinds[kind].manage} onPress={() => navigate("Collections", { kind })} style={[styles.row, { marginTop: 4 }]}>
+      <View style={styles.rowContent}>
+        <MaterialCommunityIcons name="cog-outline" size={16} color={theme.colors.textMuted} style={styles.icon} />
+        <Text style={[styles.rowLabel, { fontSize: 13, color: theme.colors.textMuted }]}>{kinds[kind].manage}</Text>
+      </View>
+    </TouchableRipple>
+  );
+
+  if (section === "settings") {
+    const pages = [
+      { label: "General", screen: "Settings", icon: "tune-variant", also: ["Password", "DebugLogs"] },
+      { label: "Collections", screen: "Collections", icon: "folder-multiple-outline", also: ["CollectionChangelog"] },
+      { label: "Invitations", screen: "Invitations", icon: "email-outline", also: [] },
+      { label: "About", screen: "About", icon: "information-outline", also: [] },
+    ];
+    return (
+      <>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, paddingVertical: 6 }]}>Settings</Text>
+        </View>
+        {pages.map((x) => (
+          <Row key={x.screen} label={x.label} accessibilityLabel={`Settings: ${x.label}`} selected={(currentScreen === x.screen) || x.also.includes(currentScreen ?? "")}
+            onPress={() => navigate(x.screen)} left={<MaterialCommunityIcons name={x.icon as any} size={17} color={theme.colors.textMuted} style={styles.icon} />} />
+        ))}
+      </>
+    );
+  }
   const colorBox = (color: string) => <View style={[styles.color, { backgroundColor: color }]} />;
 
   if (section === "calendar") {
@@ -267,26 +324,36 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
     }
     return (
       <>
-        {header("Calendars", "New calendar", () => navigate("PimCollectionCreate", { colType: C.calendarType }))}
+        {header("Calendars", "New calendar", () => dialogs.newCollection("calendar"))}
         {rows.map((x) => {
           const shown = !hidden.includes(x.colUid);
+          // (the ⋯ menu can also show only this one)
+          const onlyThis = (close: () => void) => (
+            <MenuItem icon="eye-outline" title="Show only this one" onPress={() => {
+              close();
+              dispatch(setSettings({ hiddenCalendars: [...calendars.map((c) => c.colUid), birthdaysUid].filter((c) => c !== x.colUid) }) as any);
+            }} />
+          );
           return (
-            <TouchableRipple
-              key={x.colUid}
-              accessibilityRole="checkbox"
-              accessibilityLabel={`Show ${x.name}`}
-              accessibilityState={{ checked: shown }}
-              aria-checked={shown}
-              onPress={() => toggle(x.colUid)}
-              style={styles.row}
-            >
-              <View style={styles.rowContent}>
-                <MaterialCommunityIcons name={(shown) ? "checkbox-marked" : "checkbox-blank-outline"} size={18} color={(shown) ? x.color : theme.colors.textMuted} style={styles.icon} />
-                <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.colors.textBody }]}>{x.name}</Text>
-              </View>
-            </TouchableRipple>
+            <WithMenu key={x.colUid} info={infoOf(x.colUid)} extra={onlyThis}>
+              <TouchableRipple
+                key={x.colUid}
+                accessibilityRole="checkbox"
+                accessibilityLabel={`Show ${x.name}`}
+                accessibilityState={{ checked: shown }}
+                aria-checked={shown}
+                onPress={() => toggle(x.colUid)}
+                style={styles.row}
+              >
+                <View style={styles.rowContent}>
+                  <MaterialCommunityIcons name={(shown) ? "checkbox-marked" : "checkbox-blank-outline"} size={18} color={(shown) ? x.color : theme.colors.textMuted} style={styles.icon} />
+                  <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.colors.textBody }]}>{x.name}</Text>
+                </View>
+              </TouchableRipple>
+            </WithMenu>
           );
         })}
+        {manage("calendar")}
       </>
     );
   }
@@ -302,13 +369,16 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
     };
     return (
       <>
-        {header("Lists", "New task list", () => navigate("PimCollectionCreate", { colType: C.tasksType }))}
+        {header("Lists", "New task list", () => dialogs.newCollection("tasks"))}
         <Row label="All tasks" accessibilityLabel="All tasks" selected={props.inSection && !filter} onPress={() => choose(null)} count={open.length}
           left={<MaterialCommunityIcons name="format-list-checks" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
         {lists.map((x) => (
-          <Row key={x.colUid} label={x.name} accessibilityLabel={`List ${x.name}`} selected={props.inSection && (filter === x.colUid)} onPress={() => choose(x.colUid)}
-            count={open.filter((t) => t.collectionUid === x.colUid).length} left={colorBox(x.color)} />
+          <WithMenu key={x.colUid} info={infoOf(x.colUid)}>
+            <Row label={x.name} accessibilityLabel={`List ${x.name}`} selected={props.inSection && (filter === x.colUid)} onPress={() => choose(x.colUid)}
+              count={open.filter((t) => t.collectionUid === x.colUid).length} left={colorBox(x.color)} />
+          </WithMenu>
         ))}
+        {manage("tasks")}
       </>
     );
   }
@@ -325,18 +395,26 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
     };
     return (
       <>
-        {header((groups.length > 0) ? "Groups" : "Address books", "New address book", () => navigate("PimCollectionCreate", { colType: C.contactsType }))}
+        {header("Address books", "New address book", () => dialogs.newCollection("contacts"))}
         <Row label="All contacts" accessibilityLabel="All contacts" selected={props.inSection && !filter} onPress={() => choose(null)} count={people.length}
           left={<MaterialCommunityIcons name="account-multiple-outline" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
-        {(books.length > 1) && books.map((x) => (
-          <Row key={x.colUid} label={x.name} accessibilityLabel={`Address book ${x.name}`} selected={props.inSection && (filter === `book:${x.colUid}`)}
-            onPress={() => choose(`book:${x.colUid}`)} count={people.filter((c) => c.collectionUid === x.colUid).length} left={colorBox(x.color)} />
+        {books.map((x) => (
+          <WithMenu key={x.colUid} info={infoOf(x.colUid)}>
+            <Row label={x.name} accessibilityLabel={`Address book ${x.name}`} selected={props.inSection && (filter === `book:${x.colUid}`)}
+              onPress={() => choose(`book:${x.colUid}`)} count={people.filter((c) => c.collectionUid === x.colUid).length} left={colorBox(x.color)} />
+          </WithMenu>
         ))}
+        {(groups.length > 0) && (
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, paddingVertical: 6 }]}>Groups</Text>
+          </View>
+        )}
         {groups.map((x) => (
           <Row key={x.uid} label={String(x.fn || "(no name)")} accessibilityLabel={`Group ${x.fn}`} selected={props.inSection && (filter === `group:${x.uid}`)}
             onPress={() => choose(`group:${x.uid}`)} count={x.members.length}
             left={<MaterialCommunityIcons name="account-group-outline" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
         ))}
+        {manage("contacts")}
       </>
     );
   }
@@ -361,23 +439,25 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
   };
   return (
     <>
-      {header("Notebooks", "New notebook", () => navigate("CollectionCreate"))}
+      {header("Notebooks", "New notebook", () => dialogs.newCollection("notes"))}
       <Row label="All notes" accessibilityLabel="All notes" selected={onNotes && !searching && !filterBy} onPress={() => show(undefined)} count={total}
         left={<MaterialCommunityIcons name="note-multiple-outline" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
       {notebooks.map((notebook) => (
-        <Row
-          key={notebook.colUid}
-          label={notebook.name}
-          accessibilityLabel={`Notebook ${notebook.name}`}
-          selected={onNotes && !searching && (filterBy === notebook.colUid)}
-          onPress={() => show(notebook.colUid)}
-          count={notebook.count}
-          left={colorBox(notebook.color)}
-        />
+        <WithMenu key={notebook.colUid} info={infoOf(notebook.colUid)}>
+          <Row
+            label={notebook.name}
+            accessibilityLabel={`Notebook ${notebook.name}`}
+            selected={onNotes && !searching && (filterBy === notebook.colUid)}
+            onPress={() => show(notebook.colUid)}
+            count={notebook.count}
+            left={colorBox(notebook.color)}
+          />
+        </WithMenu>
       ))}
       {(notebooks.length === 0) && (
         <Text style={[styles.empty, { color: theme.colors.textMuted }]}>No notebooks yet</Text>
       )}
+      {manage("notes")}
     </>
   );
 }
@@ -713,6 +793,13 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: "center",
     borderRadius: 8,
+  },
+  // The ⋯ of a row, over its right end
+  rowMenu: {
+    position: "absolute",
+    right: 4,
+    top: 4,
+    borderRadius: 6,
   },
   rowContent: {
     flexDirection: "row",

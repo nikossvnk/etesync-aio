@@ -20,6 +20,7 @@ import { TaskType } from "./pim-types";
 import { savePimItem, usePimItems } from "./data";
 import { AccentButton, EmptyState, toDateString } from "./widgets";
 import { useDateFormats } from "./format";
+import { useDialogs } from "./Dialogs";
 import TimeGrid, { mono, tint } from "./TimeGrid";
 import { addDays, dayCount, isBar, layoutBars, Occurrence, onDay, sameDay, startOfDay, useOccurrences } from "./occurrences";
 import { Agenda, DayPanel, EventDetails, MiniMonth, panelStyle, SmallButton, SpanBar, TasksDue } from "./CalendarParts";
@@ -49,6 +50,7 @@ function monthGrid(month: Date, weekStart: number) {
 export default function CalendarScreen() {
   const theme = useTheme();
   const navigation = useNavigation<any>();
+  const dialogs = useDialogs();
   const dispatch = useDispatch();
   const etebase = useCredentials()!;
   const syncGate = useSyncGate();
@@ -97,7 +99,7 @@ export default function CalendarScreen() {
         icon="calendar-blank-outline"
         title="No calendars yet"
         text="Create a calendar to add events to it."
-        action={<AccentButton icon="plus" label="New calendar" onPress={() => navigation.navigate("PimCollectionCreate", { colType: C.calendarType })} />}
+        action={<AccentButton icon="plus" label="New calendar" onPress={() => dialogs.newCollection("calendar")} />}
       />
     );
   }

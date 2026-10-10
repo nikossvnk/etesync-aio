@@ -21,6 +21,7 @@ import { TaskStatusType, TaskType } from "./pim-types";
 import { PimCollection, savePimItem, usePimCollections, usePimItems } from "./data";
 import { AccentButton, EmptyState } from "./widgets";
 import { DateFormats, useDateFormats } from "./format";
+import { useDialogs } from "./Dialogs";
 import { addDays, sameDay, startOfDay } from "./occurrences";
 import { mono } from "./style";
 import { panelStyle, SmallButton } from "./CalendarParts";
@@ -268,6 +269,7 @@ export default function TasksScreen() {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
+  const dialogs = useDialogs();
   const etebase = useCredentials()!;
   const syncGate = useSyncGate();
   const wide = useWindowDimensions().width >= 1100;
@@ -316,7 +318,7 @@ export default function TasksScreen() {
         icon="checkbox-marked-circle-outline"
         title="No task lists yet"
         text="Create a task list to add tasks to it."
-        action={<AccentButton icon="plus" label="New task list" onPress={() => navigation.navigate("PimCollectionCreate", { colType: C.tasksType })} />}
+        action={<AccentButton icon="plus" label="New task list" onPress={() => dialogs.newCollection("tasks")} />}
       />
     );
   }

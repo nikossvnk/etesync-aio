@@ -19,6 +19,7 @@ declare module "ical.js" {
 
     public getFirstSubcomponent(name?: string): Component | null;
     public getAllSubcomponents(name?: string): Component[];
+    public hasProperty(name: string): boolean;
 
     public getFirstPropertyValue<T = any>(name?: string): T;
 

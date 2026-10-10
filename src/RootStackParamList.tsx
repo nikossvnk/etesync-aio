@@ -35,8 +35,8 @@ export type RootStackParamList = {
   Contacts: undefined;
   Contact: { colUid: string, itemUid: string };
   ContactEdit: { colUid?: string, itemUid?: string } | undefined;
-  PimCollectionCreate: { colType: string };
   SearchAll: undefined;
+  Collections: { colUid?: string, kind?: "calendar" | "contacts" | "tasks" | "notes", share?: boolean } | undefined;
   Invitations: undefined;
   Settings: undefined;
   Password: undefined;
@@ -47,9 +47,9 @@ export type RootStackParamList = {
 };
 
 // The screens of the calendar, the tasks and the contacts (and their parts)
-export const pimScreens: string[] = ["Calendar", "EventEdit", "Tasks", "TaskEdit", "Contacts", "Contact", "ContactEdit", "PimCollectionCreate", "SearchAll"];
+export const pimScreens: string[] = ["Calendar", "EventEdit", "Tasks", "TaskEdit", "Contacts", "Contact", "ContactEdit", "SearchAll"];
 
 // The settings (and their parts) and the account's screens, which aren't about notes either
-export const accountScreens: string[] = ["Settings", "About", "Password", "DebugLogs", "Invitations"];
+export const accountScreens: string[] = ["Settings", "About", "Password", "DebugLogs", "Invitations", "Collections", "CollectionChangelog"];
 
 export type DefaultNavigationProp = StackNavigationProp<RootStackParamList, keyof RootStackParamList>;

@@ -140,7 +140,7 @@ run(async () => {
   check("and showing it shows them again", await A.has(`Standup ${n}`));
   // The settings, opened from the calendar, keep the list of the calendars (not the notebooks)
   await sideRow("Settings").click(); await wait(1500);
-  check("the settings opened from the calendar keep its list in the sidebar", (await sidebar.getByRole("checkbox", { name: "Show My Calendar" }).count() === 1) &&
+  check("the settings opened from the calendar have their own list in the sidebar (not the notebooks)", (await sideRow("Settings: Collections").count() === 1) &&
     (await sideRow("Notebook My Notes").count() === 0) && ((await sideRow("Calendar").getAttribute("aria-selected")) !== "true"));
   await sideRow("Calendar").click(); await wait(2000);
 
@@ -414,8 +414,8 @@ run(async () => {
 
   // The settings of the web app are in the settings of the notes: the date and time format
   await sideRow("Settings").click(); await wait(2000);
-  check("the settings opened from the contacts keep their list in the sidebar", (await sideRow("All contacts").count() === 1) &&
-    ((await sideRow("All contacts").getAttribute("aria-selected")) !== "true") && (await sideRow("Notebook My Notes").count() === 0));
+  check("the settings opened from the contacts have their own list too", ((await sideRow("Settings: General").getAttribute("aria-selected")) === "true") &&
+    (await sideRow("Notebook My Notes").count() === 0));
   check("the settings have the calendar and the tasks", await A.has("Calendar and Tasks") && await A.has("Date and time format") && await A.has("Sort tasks by"));
   await p.getByText("Date and time format").click(); await wait(800);
   await p.getByRole("menuitem", { name: "US" }).click(); await wait(800);

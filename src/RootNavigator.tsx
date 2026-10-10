@@ -31,9 +31,10 @@ import TasksScreen from "./pim/TasksScreen";
 import TaskEditScreen from "./pim/TaskEditScreen";
 import ContactsScreen, { ContactScreen } from "./pim/ContactsScreen";
 import ContactEditScreen from "./pim/ContactEditScreen";
-import PimCollectionCreateScreen from "./pim/PimCollectionCreateScreen";
 import SyncAction from "./pim/SyncAction";
 import SearchAllScreen from "./pim/SearchAllScreen";
+import CollectionsScreen from "./pim/CollectionsScreen";
+import { DialogsProvider } from "./pim/Dialogs";
 
 import { useCredentials } from "./credentials";
 import { performSync, popMessage } from "./store/actions";
@@ -95,223 +96,228 @@ export default React.memo(function RootNavigator() {
 
   return (
     <SearchProvider>
-      {/* Above the system's navigation bar (on Android the app is drawn behind it) */}
-      <View style={{ flex: 1, flexDirection: "row", paddingBottom: insets.bottom, backgroundColor: theme.colors.background }}>
-        {wideLayout && ((sidebarVisible) ? <Sidebar /> : <SidebarShowButton />)}
-        {wideLayout && notesShown && <NotesColumn />}
-        <View style={{ flex: 1 }}>
-          <Stack.Navigator
-            screenOptions={{
-              header: (props) => <Appbar {...props} menuFallback />,
-              cardStyle: {
-                maxHeight: "100%",
-                // (instead of the navigation's own, which is light also in dark mode)
-                backgroundColor: theme.colors.background,
-              },
-            }}
-          >
-            {(etebase === null) ? (
-              <>
-                <Stack.Screen
-                  name="Login"
-                  component={LoginScreen}
-                  options={{
-                    title: "Login",
-                    // (the screen has its own bar)
-                    headerShown: false,
-                  }}
-                />
-                <Stack.Screen
-                  name="Signup"
-                  component={SignupScreen}
-                  options={{
-                    title: "Signup",
-                    // (the screen has its own bar)
-                    headerShown: false,
-                  }}
-                />
-              </>
-            ) : (
-              <>
-                <Stack.Screen
-                  name="Home"
-                  component={HomeScreen}
-                  options={{
-                    title: C.appName,
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
-                  }}
-                />
-                <Stack.Screen
-                  name="Search"
-                  component={SearchRoute}
-                />
-                <Stack.Screen
-                  name="Notebooks"
-                  component={NotebooksRoute}
-                  options={{
-                    title: "Notebooks",
-                  }}
-                />
-                <Stack.Screen
-                  name="Collection"
-                  component={NotebooksRoute}
-                  options={{
-                    title: C.appName,
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
-                  }}
-                />
-                <Stack.Screen
-                  name="NoteCreate"
-                  component={NoteCreateScreen}
-                />
-                <Stack.Screen
-                  name="NoteProps"
-                  component={NoteRedirectScreen}
-                />
-                <Stack.Screen
-                  name="NoteMove"
-                  component={NoteRedirectScreen}
-                />
-                <Stack.Screen
-                  name="CollectionEdit"
-                  component={CollectionEditScreen}
-                />
-                <Stack.Screen
-                  name="CollectionCreate"
-                  component={CollectionEditScreen}
-                />
-                <Stack.Screen
-                  name="CollectionChangelog"
-                  component={CollectionChangelogScreen}
-                  options={{
-                    title: "Manage Notebook",
-                  }}
-                />
-                <Stack.Screen
-                  name="CollectionMembers"
-                  component={CollectionMembersScreen}
-                  options={{
-                    title: "Collection Members",
-                  }}
-                />
-                <Stack.Screen
-                  name="NoteEdit"
-                  component={NoteEditScreen}
-                />
-                <Stack.Screen
-                  name="Calendar"
-                  component={CalendarScreen}
-                  options={{
-                    title: "Calendar",
-                    headerRight: () => <SyncAction screen="Calendar" />,
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
-                  }}
-                />
-                <Stack.Screen
-                  name="EventEdit"
-                  component={EventEditScreen}
-                />
-                <Stack.Screen
-                  name="Tasks"
-                  component={TasksScreen}
-                  options={{
-                    title: "Tasks",
-                    headerRight: () => <SyncAction screen="Tasks" />,
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
-                  }}
-                />
-                <Stack.Screen
-                  name="TaskEdit"
-                  component={TaskEditScreen}
-                />
-                <Stack.Screen
-                  name="Contacts"
-                  component={ContactsScreen}
-                  options={{
-                    title: "Contacts",
-                    headerRight: () => <SyncAction screen="Contacts" />,
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
-                  }}
-                />
-                <Stack.Screen
-                  name="Contact"
-                  component={ContactScreen}
-                />
-                <Stack.Screen
-                  name="ContactEdit"
-                  component={ContactEditScreen}
-                />
-                <Stack.Screen
-                  name="SearchAll"
-                  component={SearchAllScreen}
-                  options={{
-                    title: "Search",
-                    headerLeft: () => (
-                      <MenuButton />
-                    ),
-                  }}
-                />
-                <Stack.Screen
-                  name="PimCollectionCreate"
-                  component={PimCollectionCreateScreen}
-                />
-                <Stack.Screen
-                  name="Invitations"
-                  component={InvitationsScreen}
-                  options={{
-                    title: "Collection Invitations",
-                  }}
-                />
-                <Stack.Screen
-                  name="Password"
-                  component={ChangePasswordScreen}
-                  options={{
-                    title: "Change Your Account Password",
-                  }}
-                />
-              </>
-            )}
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="About" component={AboutScreen} />
-            <Stack.Screen
-              name="DebugLogs"
-              component={DebugLogsScreen}
-              options={{
-                title: "View Debug Logs",
+      <DialogsProvider>
+        {/* Above the system's navigation bar (on Android the app is drawn behind it) */}
+        <View style={{ flex: 1, flexDirection: "row", paddingBottom: insets.bottom, backgroundColor: theme.colors.background }}>
+          {wideLayout && ((sidebarVisible) ? <Sidebar /> : <SidebarShowButton />)}
+          {wideLayout && notesShown && <NotesColumn />}
+          <View style={{ flex: 1 }}>
+            <Stack.Navigator
+              screenOptions={{
+                header: (props) => <Appbar {...props} menuFallback />,
+                cardStyle: {
+                  maxHeight: "100%",
+                  // (instead of the navigation's own, which is light also in dark mode)
+                  backgroundColor: theme.colors.background,
+                },
               }}
-            />
-            {/* We keep this outside of the guarded routes so we can navigate to it from the login/signup screens */}
-            <Stack.Screen
-              name="AccountWizard"
-              component={AccountWizardScreen}
-              options={{
-                title: C.appName,
-              }}
-            />
-            <Stack.Screen
-              name="404"
-              component={NotFoundScreen}
-              options={{
-                title: "Page Not Found",
-                headerLeft: () => (
-                  <MenuButton />
-                ),
-              }}
-            />
-          </Stack.Navigator>
+            >
+              {(etebase === null) ? (
+                <>
+                  <Stack.Screen
+                    name="Login"
+                    component={LoginScreen}
+                    options={{
+                      title: "Login",
+                      // (the screen has its own bar)
+                      headerShown: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="Signup"
+                    component={SignupScreen}
+                    options={{
+                      title: "Signup",
+                      // (the screen has its own bar)
+                      headerShown: false,
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <Stack.Screen
+                    name="Home"
+                    component={HomeScreen}
+                    options={{
+                      title: C.appName,
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
+                  />
+                  <Stack.Screen
+                    name="Search"
+                    component={SearchRoute}
+                  />
+                  <Stack.Screen
+                    name="Notebooks"
+                    component={NotebooksRoute}
+                    options={{
+                      title: "Notebooks",
+                    }}
+                  />
+                  <Stack.Screen
+                    name="Collection"
+                    component={NotebooksRoute}
+                    options={{
+                      title: C.appName,
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
+                  />
+                  <Stack.Screen
+                    name="NoteCreate"
+                    component={NoteCreateScreen}
+                  />
+                  <Stack.Screen
+                    name="NoteProps"
+                    component={NoteRedirectScreen}
+                  />
+                  <Stack.Screen
+                    name="NoteMove"
+                    component={NoteRedirectScreen}
+                  />
+                  <Stack.Screen
+                    name="CollectionEdit"
+                    component={CollectionEditScreen}
+                  />
+                  <Stack.Screen
+                    name="CollectionCreate"
+                    component={CollectionEditScreen}
+                  />
+                  <Stack.Screen
+                    name="CollectionChangelog"
+                    component={CollectionChangelogScreen}
+                    options={{
+                      title: "Manage Notebook",
+                    }}
+                  />
+                  <Stack.Screen
+                    name="CollectionMembers"
+                    component={CollectionMembersScreen}
+                    options={{
+                      title: "Collection Members",
+                    }}
+                  />
+                  <Stack.Screen
+                    name="NoteEdit"
+                    component={NoteEditScreen}
+                  />
+                  <Stack.Screen
+                    name="Calendar"
+                    component={CalendarScreen}
+                    options={{
+                      title: "Calendar",
+                      headerRight: () => <SyncAction screen="Calendar" />,
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
+                  />
+                  <Stack.Screen
+                    name="EventEdit"
+                    component={EventEditScreen}
+                  />
+                  <Stack.Screen
+                    name="Tasks"
+                    component={TasksScreen}
+                    options={{
+                      title: "Tasks",
+                      headerRight: () => <SyncAction screen="Tasks" />,
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
+                  />
+                  <Stack.Screen
+                    name="TaskEdit"
+                    component={TaskEditScreen}
+                  />
+                  <Stack.Screen
+                    name="Contacts"
+                    component={ContactsScreen}
+                    options={{
+                      title: "Contacts",
+                      headerRight: () => <SyncAction screen="Contacts" />,
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
+                  />
+                  <Stack.Screen
+                    name="Contact"
+                    component={ContactScreen}
+                  />
+                  <Stack.Screen
+                    name="ContactEdit"
+                    component={ContactEditScreen}
+                  />
+                  <Stack.Screen
+                    name="Collections"
+                    component={CollectionsScreen}
+                    options={{
+                      title: "Collections",
+                    }}
+                  />
+                  <Stack.Screen
+                    name="SearchAll"
+                    component={SearchAllScreen}
+                    options={{
+                      title: "Search",
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
+                  />
+                  <Stack.Screen
+                    name="Invitations"
+                    component={InvitationsScreen}
+                    options={{
+                      title: "Collection Invitations",
+                    }}
+                  />
+                  <Stack.Screen
+                    name="Password"
+                    component={ChangePasswordScreen}
+                    options={{
+                      title: "Change Your Account Password",
+                    }}
+                  />
+                </>
+              )}
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+              <Stack.Screen name="About" component={AboutScreen} />
+              <Stack.Screen
+                name="DebugLogs"
+                component={DebugLogsScreen}
+                options={{
+                  title: "View Debug Logs",
+                }}
+              />
+              {/* We keep this outside of the guarded routes so we can navigate to it from the login/signup screens */}
+              <Stack.Screen
+                name="AccountWizard"
+                component={AccountWizardScreen}
+                options={{
+                  title: C.appName,
+                }}
+              />
+              <Stack.Screen
+                name="404"
+                component={NotFoundScreen}
+                options={{
+                  title: "Page Not Found",
+                  headerLeft: () => (
+                    <MenuButton />
+                  ),
+                }}
+              />
+            </Stack.Navigator>
+          </View>
+          <GlobalMessages />
         </View>
-        <GlobalMessages />
-      </View>
+      </DialogsProvider>
     </SearchProvider>
   );
 });

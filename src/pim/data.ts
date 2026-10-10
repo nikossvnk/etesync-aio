@@ -7,6 +7,8 @@
 
 import * as React from "react";
 import * as Etebase from "etebase";
+import * as ICAL from "ical.js";
+import * as C from "../constants";
 import { useSelector } from "react-redux";
 
 import { store, StoreState } from "../store";
@@ -128,9 +130,46 @@ function loadCollection(etebase: Etebase.Account, colUid: string) {
 
 // Saves a new item (when it has no itemUid yet) or a changed one to a collection. Moving an item to
 // another collection saves it there and deletes it from the one it was in.
+// An event (or task) that repeats can have times that are changed or cancelled, which are more
+// components with its UID (and a RECURRENCE-ID) in the same item. The app edits only the event itself,
+// so these are kept from what the item had (with the time zones they use).
+async function withExceptions(etebase: Etebase.Account, item: PimType, content: string) {
+  if (!item.itemUid || !item.collectionUid) {
+    return content;
+  }
+  const state = store.getState() as unknown as StoreState;
+  const cachedCol = state.allCache.collections.get(item.collectionUid);
+  const cachedItem = state.allCache.items.get(item.collectionUid)?.get(item.itemUid);
+  if (!cachedCol || !cachedItem || ![C.calendarType, C.tasksType].includes(cachedCol.collectionType)) {
+    return content;
+  }
+  try {
+    const colMgr = etebase.getCollectionManager();
+    const before = await colMgr.getItemManager(colMgr.cacheLoad(cachedCol.cache)).cacheLoad(cachedItem.cache).getContent(Etebase.OutputFormat.String);
+    const old = new ICAL.Component(ICAL.parse(before));
+    const exceptions = old.getAllSubcomponents().filter((x) => ["vevent", "vtodo"].includes(x.name) && x.hasProperty("recurrence-id"));
+    if (exceptions.length === 0) {
+      return content;
+    }
+    const comp = new ICAL.Component(ICAL.parse(content));
+    const zones = new Set(comp.getAllSubcomponents("vtimezone").map((x) => String(x.getFirstPropertyValue("tzid"))));
+    for (const zone of old.getAllSubcomponents("vtimezone")) {
+      if (!zones.has(String(zone.getFirstPropertyValue("tzid")))) {
+        comp.addSubcomponent(new ICAL.Component(zone.toJSON()));
+      }
+    }
+    for (const exception of exceptions) {
+      comp.addSubcomponent(new ICAL.Component(exception.toJSON()));
+    }
+    return comp.toString();
+  } catch (e) {
+    return content;
+  }
+}
+
 export async function savePimItem(etebase: Etebase.Account, colUid: string, item: PimType) {
   const mtime = (new Date()).getTime();
-  const content = item.toIcal();
+  const content = await withExceptions(etebase, item, item.toIcal());
 
   if (item.itemUid && item.collectionUid && (item.collectionUid !== colUid)) {
     await deletePimItem(etebase, item);

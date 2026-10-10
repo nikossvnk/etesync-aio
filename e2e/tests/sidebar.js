@@ -147,6 +147,8 @@ run(async () => {
 
   // New notebook
   await row("New notebook").click(); await A.wait(1500);
-  check("new notebook opens the form for it", path() === "/new-notebook", path());
+  const dialog = A.p.locator('[data-testid="new-collection"] >> visible=true');
+  check("new notebook opens the dialog for it, with a notebook chosen", (await dialog.count() === 1) &&
+    ((await dialog.getByRole("radio", { name: "Notebook" }).getAttribute("aria-checked")) === "true"));
   await b.close();
 });

@@ -22,6 +22,7 @@ import { ContactType, TaskType } from "./pim-types";
 import { usePimCollections, usePimItems } from "./data";
 import { AccentButton, EmptyState } from "./widgets";
 import { useDateFormats } from "./format";
+import { useDialogs } from "./Dialogs";
 import { addDays, contactBirthday, initials, startOfDay, useOccurrences } from "./occurrences";
 import { formatDue } from "./TasksScreen";
 import { formatRange } from "./CalendarParts";
@@ -247,6 +248,7 @@ export function ContactDetails(props: { contact: ContactType }) {
 export default function ContactsScreen() {
   const theme = useTheme();
   const navigation = useNavigation<any>();
+  const dialogs = useDialogs();
   const etebase = useCredentials()!;
   const syncGate = useSyncGate();
   const wide = useWindowDimensions().width >= 1100;
@@ -282,7 +284,7 @@ export default function ContactsScreen() {
         icon="account-box-outline"
         title="No address books yet"
         text="Create an address book to add contacts to it."
-        action={<AccentButton icon="plus" label="New address book" onPress={() => navigation.navigate("PimCollectionCreate", { colType: C.contactsType })} />}
+        action={<AccentButton icon="plus" label="New address book" onPress={() => dialogs.newCollection("contacts")} />}
       />
     );
   }

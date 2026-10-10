@@ -7,7 +7,7 @@ export const appName = "EteSync";
 export const homePage = "https://www.etesync.com/";
 export const faq = homePage + "faq/";
 export const pricing = homePage + "pricing/";
-export const sourceCode = "https://github.com/nikossvnk/etesync-notes";
+export const sourceCode = "https://github.com/nikossvnk/etesync-aio";
 export const reportIssue = sourceCode + "/issues";
 
 export const forgotPassword = faq + "#forgot-password";

@@ -37,7 +37,7 @@ Options (environment variables):
 | `BROWSER` | the first one found of Chromium, Chrome, Brave, Edge, Firefox | The browser the shortcut opens. Chromium-based browsers open it in an app window, Firefox in a new window |
 | `LOW_MEMORY` | `1` | Chromium-based browsers get flags that make them use a bit less memory (no spare page process, at most two, no background downloads, updates or sync); `0` leaves them out |
 
-Then open "EteSync" from the applications menu or the desktop, and log in with the server URL
+Then open "EteSync Desktop" from the applications menu or the desktop, and log in with the server URL
 (under "Advanced settings"), e.g. `https://etebase.example.com`.
 
 ## What the script sets up
@@ -60,7 +60,7 @@ To do the same by hand:
 
    ```
    [Unit]
-   Description=EteSync, served on http://localhost:8092 (this computer only)
+   Description=EteSync Desktop, served on http://localhost:8092 (this computer only)
 
    [Service]
    ExecStart=/usr/bin/python3 %h/.local/share/etesync-aio-web/serve.py --port 8092 --dir %h/.local/share/etesync-aio-web/site
@@ -77,7 +77,7 @@ To do the same by hand:
    ```
    [Desktop Entry]
    Type=Application
-   Name=EteSync
+   Name=EteSync Desktop
    Exec=chromium --app=http://localhost:8092
    Icon=/home/<you>/.local/share/etesync-aio-web/icon.png
    Categories=Office;

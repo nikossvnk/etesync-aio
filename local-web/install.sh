@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs EteSync (notes, calendar, tasks and contacts) as a web app that runs on this computer only, built from the repository
+# Installs EteSync Desktop (notes, bookmarks, calendar, tasks and contacts) as a web app that runs on this computer only, built from the repository
 # this script is in, or updates it when it's installed already (it's safe to run again).
 # See README.md in this directory.
 #
@@ -13,7 +13,7 @@
 #   1. Builds the web version of this repository into ~/.local/share/etesync-aio-web/site
 #   2. Serves it on http://localhost:PORT with a systemd user service, etesync-aio-web.service,
 #      which starts when you log in (only reachable from this computer)
-#   3. Adds "EteSync" to the applications menu, and a shortcut on the desktop
+#   3. Adds "EteSync Desktop" to the applications menu, and a shortcut on the desktop
 set -euo pipefail
 
 PORT="${PORT:-8092}"
@@ -87,7 +87,7 @@ cp "$SRC/assets/icon.png" "$BASE/icon.png"
 mkdir -p "$UNIT_DIR"
 cat > "$UNIT_DIR/etesync-aio-web.service" <<UNIT
 [Unit]
-Description=EteSync (all-in-one), served on $URL (this computer only)
+Description=EteSync Desktop, served on $URL (this computer only)
 
 [Service]
 ExecStart=$(command -v python3) $BASE/serve.py --port $PORT --dir $SITE
@@ -134,8 +134,8 @@ desktop_file="$APPS_DIR/etesync-aio-web.desktop"
 cat > "$desktop_file" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=EteSync
-Comment=End-to-end encrypted notes, calendar, tasks and contacts (runs on this computer, $URL)
+Name=EteSync Desktop
+Comment=End-to-end encrypted notes, bookmarks, calendar, tasks and contacts (runs on this computer, $URL)
 Exec=$exec_line
 Icon=$BASE/icon.png
 Categories=Office;Calendar;ContactManagement;
@@ -152,5 +152,5 @@ if [ -d "$desktop_dir" ]; then
 fi
 
 step "Done"
-echo "EteSync runs on $URL. Open it from the applications menu or the desktop (it opens with: $exec_line)."
+echo "EteSync Desktop runs on $URL. Open it from the applications menu or the desktop (it opens with: $exec_line)."
 echo "To update it later: git pull, then run this script again."

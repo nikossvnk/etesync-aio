@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: © 2019 EteSync Authors
 // SPDX-License-Identifier: GPL-3.0-only
 
-// The collections of all four kinds (notebooks, calendars, task lists, address books): what they are
-// called, making, changing, deleting and exporting them, and who they are shared with
+// The collections of all kinds (notebooks, calendars, task lists, address books, bookmark lists): what
+// they are called, making, changing, deleting and exporting them, and who they are shared with
 
 import * as React from "react";
 import * as Etebase from "etebase";
@@ -14,16 +14,23 @@ import { deleteCollectionLocally, saveCollectionLocally } from "../sync/SyncMana
 import * as C from "../constants";
 import { saveFile } from "../import-export";
 import { defaultColor } from "./data";
+import { bookmarksFrom, bookmarksToHtml } from "../bookmarks";
 
-export type Kind = "calendar" | "contacts" | "tasks" | "notes";
+export type Kind = "calendar" | "contacts" | "tasks" | "notes" | "bookmarks";
 
 export const kinds: { [kind in Kind]: { type: string, label: string, one: string, noun: string, unit: string, icon: string, screen: string, manage: string } } = {
   calendar: { type: C.calendarType, label: "Calendars", one: "Calendar", noun: "calendar", unit: "events", icon: "calendar-blank-outline", screen: "Calendar", manage: "Manage calendars" },
   contacts: { type: C.contactsType, label: "Address books", one: "Address book", noun: "address book", unit: "contacts", icon: "card-account-details-outline", screen: "Contacts", manage: "Manage address books" },
   tasks: { type: C.tasksType, label: "Task lists", one: "Task list", noun: "task list", unit: "tasks", icon: "checkbox-marked-circle-outline", screen: "Tasks", manage: "Manage lists" },
   notes: { type: C.colType, label: "Notebooks", one: "Notebook", noun: "notebook", unit: "notes", icon: "file-document-outline", screen: "Home", manage: "Manage notebooks" },
+  bookmarks: { type: C.bookmarkColType, label: "Bookmark lists", one: "Bookmark list", noun: "bookmark list", unit: "bookmarks", icon: "bookmark-outline", screen: "Bookmarks", manage: "Manage bookmark lists" },
 };
-export const kindOrder: Kind[] = ["calendar", "contacts", "tasks", "notes"];
+export const kindOrder: Kind[] = ["calendar", "contacts", "tasks", "notes", "bookmarks"];
+
+// The file a collection is exported as
+export function exportExtension(kind: Kind) {
+  return (kind === "contacts") ? "vcf" : (kind === "notes") ? "md" : (kind === "bookmarks") ? "html" : "ics";
+}
 
 export function kindOf(type: string): Kind | undefined {
   return kindOrder.find((k) => kinds[k].type === type);
@@ -124,11 +131,18 @@ export function deleteCollection(etebase: Etebase.Account, colUid: string) {
 }
 
 // Saves a calendar or task list as an .ics file, an address book as a .vcf file, a notebook as a
-// Markdown file (its notes one after the other)
+// Markdown file (its notes one after the other), a bookmark list as a browser's bookmark file (.html)
 export async function exportCollection(etebase: Etebase.Account, colUid: string) {
   const state = store.getState() as unknown as StoreState;
   const { colMgr, col } = loadCollection(etebase, colUid);
   const kind = kindOf(col.getCollectionType())!;
+  const name = (col.getMeta().name || kinds[kind].noun).replace(/[\\/:*?"<>|]/g, "_");
+  if (kind === "bookmarks") {
+    // (all that's needed is in the meta, there's no content to decrypt)
+    const bookmarks = bookmarksFrom(state.allCache.items.filter((_x, uid) => uid === colUid));
+    await saveFile(`${name}.html`, new TextEncoder().encode(bookmarksToHtml(col.getMeta().name ?? "", bookmarks)), "text/html");
+    return bookmarks.length;
+  }
   const itemMgr = colMgr.getItemManager(col);
   const contents: string[] = [];
   const names: string[] = [];
@@ -138,7 +152,6 @@ export async function exportCollection(etebase: Etebase.Account, colUid: string)
       names.push(cached.meta.name ?? "");
     }
   }
-  const name = (col.getMeta().name || kinds[kind].noun).replace(/[\\/:*?"<>|]/g, "_");
   let text: string;
   let ext: string;
   let mime: string;

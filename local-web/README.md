@@ -89,6 +89,9 @@ To do the same by hand:
 
 - The login is kept in the browser's storage for `http://localhost:8092`. Anyone who can use your
   browser profile can use the account, so only use it on your own computer.
+- "Get title" of a bookmark makes the service fetch the page of its link, from this computer, to
+  read its title (the browser doesn't let the app do it). Only the title goes to the app. Nothing
+  is fetched without that button.
 - Notes, events, tasks and contacts you have opened stay available offline, but the browser needs the service running to load
   the app.
 - Changing `PORT` later means a new origin for the browser, so you have to log in again.

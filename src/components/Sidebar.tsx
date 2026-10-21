@@ -26,6 +26,7 @@ import { addDays, birthdaysColor, birthdaysUid, contactBirthday, startOfDay, use
 import { CollectionInfo, Kind, kinds, useCollectionInfos } from "../pim/collections";
 import { CollectionMenu } from "../pim/CollectionsScreen";
 import { useDialogs } from "../pim/Dialogs";
+import { bookmarksSelector } from "../bookmarks";
 
 export { useSidebarShown } from "./WideLayout";
 
@@ -199,12 +200,14 @@ function Account() {
   );
 }
 
-type Section = "notes" | "calendar" | "tasks" | "contacts" | "settings" | "other";
+type Section = "notes" | "bookmarks" | "calendar" | "tasks" | "contacts" | "settings" | "other";
 
-// Which of the four sections a screen belongs to
+// Which of the five sections a screen belongs to
 export function sectionOf(screen: string | undefined): Section {
   if (!screen) {
     return "notes";
+  } else if (screen === "Bookmarks") {
+    return "bookmarks";
   } else if (["Calendar", "EventEdit"].includes(screen)) {
     return "calendar";
   } else if (["Tasks", "TaskEdit"].includes(screen)) {
@@ -219,7 +222,7 @@ export function sectionOf(screen: string | undefined): Section {
   return "notes";
 }
 
-// The "+" next to the search: making a note, an event, a task or a contact from anywhere
+// The "+" next to the search: making a note, a bookmark, an event, a task or a contact from anywhere
 function CreateButton() {
   const theme = useTheme();
   const [visible, setVisible] = React.useState(false);
@@ -244,6 +247,7 @@ function CreateButton() {
       )}
     >
       <MenuItem icon="note-plus-outline" title="New note" onPress={() => create("NoteCreate", (filterBy) ? { colUid: filterBy } : undefined)} />
+      <MenuItem icon="bookmark-plus-outline" title="New bookmark" onPress={() => create("Bookmarks", { url: "" })} />
       <MenuItem icon="calendar-plus" title="New event" onPress={() => create("EventEdit")} />
       <MenuItem icon="checkbox-marked-circle-plus-outline" title="New task" onPress={() => create("TaskEdit")} />
       <MenuItem icon="account-plus-outline" title="New contact" onPress={() => create("ContactEdit")} />
@@ -251,8 +255,8 @@ function CreateButton() {
   );
 }
 
-// The list under the sections, which is about the section that is open: the notebooks, the calendars
-// (to hide and show them), the task lists, or the address books and groups of contacts
+// The list under the sections, which is about the section that is open: the notebooks, the bookmark
+// lists, the calendars (to hide and show them), the task lists, or the address books and groups of contacts
 // (inSection: the page is of the section, rather than e.g. the settings opened from it, where none
 // of the list is the chosen one)
 function SectionList(props: { section: Section, inSection: boolean, onPimScreen: boolean }) {
@@ -268,6 +272,8 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
   const calendars = usePimCollections(C.calendarType);
   const lists = usePimCollections(C.tasksType);
   const books = usePimCollections(C.contactsType);
+  const bookmarkLists = usePimCollections(C.bookmarkColType);
+  const bookmarkItems = useSelector(bookmarksSelector);
   const tasks = usePimItems(etebase, C.tasksType, TaskType.parse);
   const contacts = usePimItems(etebase, C.contactsType, ContactType.parse);
   const searching = query.trim() !== "";
@@ -383,6 +389,32 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
     );
   }
 
+  if (section === "bookmarks") {
+    const filter = (bookmarkLists.some((x) => x.colUid === settings.bookmarksFilter)) ? settings.bookmarksFilter : null;
+    const countOf = (colUid: string) => bookmarkItems.get(colUid)?.count((x) => !x.isDeleted) ?? 0;
+    const choose = (colUid: string | null) => {
+      dispatch(setSettings({ bookmarksFilter: colUid }) as any);
+      if (currentScreen !== "Bookmarks") {
+        navigate("Bookmarks");
+      }
+    };
+    return (
+      <>
+        {header("Bookmark lists", "New bookmark list", () => dialogs.newCollection("bookmarks"))}
+        <Row label="All bookmarks" accessibilityLabel="All bookmarks" selected={props.inSection && !filter} onPress={() => choose(null)}
+          count={bookmarkLists.reduce((sum, x) => sum + countOf(x.colUid), 0)}
+          left={<MaterialCommunityIcons name="bookmark-multiple-outline" size={18} color={theme.colors.textMuted} style={styles.icon} />} />
+        {bookmarkLists.map((x) => (
+          <WithMenu key={x.colUid} info={infoOf(x.colUid)}>
+            <Row label={x.name} accessibilityLabel={`Bookmark list ${x.name}`} selected={props.inSection && (filter === x.colUid)} onPress={() => choose(x.colUid)}
+              count={countOf(x.colUid)} left={colorBox(x.color)} />
+          </WithMenu>
+        ))}
+        {manage("bookmarks")}
+      </>
+    );
+  }
+
   if (section === "contacts") {
     const people = (contacts ?? []).filter((x) => !x.group);
     const groups = (contacts ?? []).filter((x) => x.group).sort((a, b) => String(a.fn).localeCompare(String(b.fn)));
@@ -471,6 +503,7 @@ export default function Sidebar() {
   const { currentScreen, currentParams, navigate } = useWideNavigation();
   const { query, setQuery } = useSearchQuery();
   const cacheItems = useSelector((state: StoreState) => state.cache.items);
+  const bookmarkItems = useSelector(bookmarksSelector);
   const savedWidth = useSelector((state: StoreState) => state.settings.sidebarWidth);
   const resize = useResize(savedWidth, (sidebarWidth) => dispatch(setSettings({ sidebarWidth }) as any));
   const pendingCount = usePendingCount();
@@ -490,6 +523,7 @@ export default function Sidebar() {
   const { occurrences: todays } = useOccurrences(today, addDays(today, 1));
   const tasks = usePimItems(etebase, C.tasksType, TaskType.parse);
   const notesCount = React.useMemo(() => cacheItems.reduce((sum, items) => sum + items.count((x) => !x.isDeleted), 0), [cacheItems]);
+  const bookmarksCount = React.useMemo(() => bookmarkItems.reduce((sum, items) => sum + items.count((x) => !x.isDeleted), 0), [bookmarkItems]);
   const dueCount = (tasks ?? []).filter((x) => !x.finished && (x.overdue || x.dueToday)).length;
 
   function search(value: string) {
@@ -504,6 +538,7 @@ export default function Sidebar() {
 
   const sections = [
     { key: "notes", label: "Notes", icon: "file-document-outline", screen: "Home", count: notesCount },
+    { key: "bookmarks", label: "Bookmarks", icon: "bookmark-multiple-outline", screen: "Bookmarks", count: bookmarksCount },
     { key: "calendar", label: "Calendar", icon: "calendar-blank-outline", screen: "Calendar", count: (todays?.length) ? `${todays.length} today` : "" },
     { key: "tasks", label: "Tasks", icon: "checkbox-marked-circle-outline", screen: "Tasks", badge: dueCount },
     { key: "contacts", label: "Contacts", icon: "account-outline", screen: "Contacts" },

@@ -54,6 +54,7 @@ const rootStackScreens: RootStackScreens = {
   Contacts: "contacts",
   Contact: "contacts/:colUid/:itemUid",
   ContactEdit: "contacts/edit",
+  Bookmarks: "bookmarks",
   SearchAll: "search-all",
   Collections: "settings/collections",
   Invitations: "invitations",

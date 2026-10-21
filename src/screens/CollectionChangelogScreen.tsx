@@ -49,10 +49,11 @@ export default function CollectionChangelogScreen(props: PropsType) {
   const cachedCollection = cachedCollections.get(colUid);
   const colCachedItems = cachedItems.get(colUid);
   const kind = (cachedCollection) ? kindOf(cachedCollection.collectionType) : undefined;
-  // The titles of events, tasks and contacts are in them (their item's name is their UID)
+  // The titles of events, tasks and contacts are in them (their item's name is their UID). Notes and
+  // bookmarks have theirs as their name.
   const [titles, setTitles] = React.useState<Map<string, string>>(new Map());
   React.useEffect(() => {
-    if (!etebase || !cachedCollection || !colCachedItems || (kind === "notes")) {
+    if (!etebase || !cachedCollection || !colCachedItems || (kind === "notes") || (kind === "bookmarks")) {
       return undefined;
     }
     let cancelled = false;
@@ -83,7 +84,7 @@ export default function CollectionChangelogScreen(props: PropsType) {
   // Opening an item (that's still there)
   function open(itemUid: string) {
     const params = { colUid, itemUid };
-    const screen = { calendar: "EventEdit", tasks: "TaskEdit", contacts: "Contact", notes: "NoteEdit" }[kind!];
+    const screen = { calendar: "EventEdit", tasks: "TaskEdit", contacts: "Contact", notes: "NoteEdit", bookmarks: "Bookmarks" }[kind!];
     navigation.navigate(screen as any, params as any);
   }
 
@@ -116,7 +117,8 @@ export default function CollectionChangelogScreen(props: PropsType) {
 
     const icon = (item.isDeleted) ? iconDeleted : iconChanged;
 
-    const name = titles.get(item.uid) ?? item.meta.name ?? "";
+    // (a bookmark without a title is shown as its link)
+    const name = titles.get(item.uid) || item.meta.name || (item.meta as { url?: string }).url || "";
     const mtime = (item.meta.mtime) ? `${fmt.mediumDate(new Date(item.meta.mtime))}, ${fmt.timeSeconds(new Date(item.meta.mtime))}` : undefined;
 
     return (

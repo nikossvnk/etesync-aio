@@ -25,3 +25,8 @@ export const calendarType = "etebase.vevent";
 export const tasksType = "etebase.vtodo";
 export const contactsType = "etebase.vcard";
 export const pimTypes = [calendarType, tasksType, contactsType];
+// Bookmarks: the title is the item's name, the link and the rest are in its meta (see bookmarks.ts).
+// The same type as the bookmarks of EteSync Notes (on Android).
+export const bookmarkColType = "etebase.bookmark";
+// All of the types that are synced
+export const collectionTypes = [colType, ...pimTypes, bookmarkColType];

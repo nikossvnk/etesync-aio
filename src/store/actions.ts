@@ -200,8 +200,11 @@ export const unsetSyncItem = createAction(
 
 export const setSyncGeneral = createAction(
   "SET_SYNC_GENERAL",
-  (stoken: string | null) => {
+  (stoken: string | null, _types: string[]) => {
     return stoken;
+  },
+  (_stoken: string | null, types: string[]) => {
+    return { types };
   }
 );
 

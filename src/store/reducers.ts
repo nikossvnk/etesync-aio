@@ -36,6 +36,8 @@ export type CachedCollectionsData = ImmutableMap<string, CachedCollection>;
 export type SyncGeneralData = {
   stoken?: string | null;
   lastSyncDate?: Date;
+  // The collection types the stoken is for (the notes only if unset, as etesync-notes synced only them)
+  types?: string[];
 };
 
 export type Message = {
@@ -145,11 +147,12 @@ export const syncItems = handleActions(
 
 export const syncGeneral = handleActions(
   {
-    [actions.setSyncGeneral.toString()]: (state: SyncGeneralData, action: Action<string | null | undefined>) => {
+    [actions.setSyncGeneral.toString()]: (state: SyncGeneralData, action: ActionMeta<string | null | undefined, { types: string[] }>) => {
       if (action.payload !== undefined) {
         return {
           stoken: action.payload,
           lastSyncDate: new Date(),
+          types: action.meta?.types,
         };
       }
       return state;
@@ -391,6 +394,9 @@ export interface SettingsType {
   showRepeating: boolean;
   // The contacts that are shown: all of them (null), an address book's ("book:<colUid>"), or a group's ("group:<uid>")
   contactsFilter: string | null;
+  // The bookmarks that are shown: all of them (null) or a bookmark list's (its uid), and their order
+  bookmarksFilter: string | null;
+  bookmarksSort: "newest" | "oldest" | "title" | "site";
   logLevel: LogLevel;
   ranWizrd: boolean;
   theme: "auto" | "dark" | "light";
@@ -426,6 +432,8 @@ export const settingsReducer = handleActions(
     hiddenCalendars: [],
     showRepeating: false,
     contactsFilter: null,
+    bookmarksFilter: null,
+    bookmarksSort: "newest",
     logLevel: LogLevel.Off,
     ranWizrd: false,
     theme: "auto",

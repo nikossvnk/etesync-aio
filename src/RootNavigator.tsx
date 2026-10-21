@@ -34,6 +34,7 @@ import ContactEditScreen from "./pim/ContactEditScreen";
 import SyncAction from "./pim/SyncAction";
 import SearchAllScreen from "./pim/SearchAllScreen";
 import CollectionsScreen from "./pim/CollectionsScreen";
+import BookmarksScreen from "./pim/BookmarksScreen";
 import { DialogsProvider } from "./pim/Dialogs";
 
 import { useCredentials } from "./credentials";
@@ -252,6 +253,17 @@ export default React.memo(function RootNavigator() {
                   <Stack.Screen
                     name="ContactEdit"
                     component={ContactEditScreen}
+                  />
+                  <Stack.Screen
+                    name="Bookmarks"
+                    component={BookmarksScreen}
+                    options={{
+                      title: "Bookmarks",
+                      headerRight: () => <SyncAction screen="Bookmarks" />,
+                      headerLeft: () => (
+                        <MenuButton />
+                      ),
+                    }}
                   />
                   <Stack.Screen
                     name="Collections"

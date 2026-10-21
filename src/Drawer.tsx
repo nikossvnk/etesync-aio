@@ -173,6 +173,7 @@ export default function Drawer(props: PropsType) {
 
   const items: { label: string, icon: string, screen: string, also?: string[] }[] = (loggedIn) ? [
     { label: "Notes", icon: "file-document-outline", screen: "Home", also: ["NoteEdit", "NoteCreate", "Search"] },
+    { label: "Bookmarks", icon: "bookmark-multiple-outline", screen: "Bookmarks" },
     { label: "Notebooks", icon: "notebook-multiple", screen: "Notebooks", also: ["Collection"] },
     ...pimMenuItems.map((x) => ({ label: x.title, icon: x.icon, screen: x.path })),
     { label: "Settings", icon: "tune-variant", screen: "Settings" },

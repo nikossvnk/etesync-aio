@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: © 2019 EteSync Authors
 // SPDX-License-Identifier: GPL-3.0-only
 
-// The dialogs that open over any page: making a collection (a calendar, a task list, an address book
-// or a notebook), and importing files (choose, review, done)
+// The dialogs that open over any page: making a collection (a calendar, a task list, an address book,
+// a notebook or a bookmark list), and importing files (choose, review, done)
 
 import * as React from "react";
 import { Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
@@ -187,13 +187,19 @@ export function Labelled(props: React.PropsWithChildren<{ label: string, optiona
 export const DialogInput = React.forwardRef(function DialogInput(props: React.ComponentProps<typeof TextInput>, ref: React.Ref<TextInput>) {
   const theme = useTheme();
   const [focused, setFocused] = React.useState(false);
-  const { style, ...rest } = props;
+  const { style, onFocus, onBlur, ...rest } = props;
   return (
     <TextInput
       ref={ref}
       placeholderTextColor={theme.colors.textMuted}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onFocus={(e) => {
+        setFocused(true);
+        onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        onBlur?.(e);
+      }}
       style={[styles.input, { color: theme.colors.text, backgroundColor: theme.colors.background, borderColor: (focused) ? theme.colors.accent : theme.colors.border }, style]}
       {...rest}
     />
@@ -205,6 +211,7 @@ const placeholders: { [kind in Kind]: string } = {
   contacts: "e.g. Clients, Neighbours",
   tasks: "e.g. Groceries, Side project",
   notes: "e.g. Journal, Ideas",
+  bookmarks: "e.g. Work links, Reading list",
 };
 
 function NewCollectionDialog(props: { kind: Kind, onClose: () => void, onImport: () => void }) {
@@ -229,10 +236,12 @@ function NewCollectionDialog(props: { kind: Kind, onClose: () => void, onImport:
     const colUid = await createCollection(etebase, kind, { name: name.trim(), description: description.trim(), color });
     dispatch(pushMessage({ message: `${info.one} created`, severity: "success" }) as any);
     props.onClose();
-    // (to it: its section, or the notes of the notebook)
+    // (to it: its section, or the notes of the notebook, or the bookmarks of the list)
     if (kind === "notes") {
       const viewSettings = (store.getState() as unknown as StoreState).settings.viewSettings;
       dispatch(setSettings({ viewSettings: { ...viewSettings, filterBy: colUid } }) as any);
+    } else if (kind === "bookmarks") {
+      dispatch(setSettings({ bookmarksFilter: colUid }) as any);
     }
     navigation.navigate("Root", { screen: info.screen });
   }
@@ -282,7 +291,7 @@ function NewCollectionDialog(props: { kind: Kind, onClose: () => void, onImport:
         <DialogInput value={description} onChangeText={setDescription} accessibilityLabel="Description" />
       </Labelled>
       <Text accessibilityRole="link" onPress={props.onImport} style={{ fontSize: 13, color: theme.colors.accentText }}>
-        <MaterialCommunityIcons name="tray-arrow-up" size={14} color={theme.colors.accentText} /> Have an .ics, .vcf or notes file? Import it instead
+        <MaterialCommunityIcons name="tray-arrow-up" size={14} color={theme.colors.accentText} /> Have an .ics, .vcf, notes or browser bookmarks file? Import it instead
       </Text>
       <Labelled label="Colour">
         <SwatchPicker value={color} onChange={setColor} />
@@ -369,7 +378,7 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
     }
     const accepted = files.filter((x) => isAccepted(x.name));
     if (accepted.length === 0) {
-      setError("These files can't be imported: choose .ics, .vcf, .md or .txt files.");
+      setError("These files can't be imported: choose .ics, .vcf, .md, .txt or .html files.");
       return;
     }
     const result = readFiles(accepted);
@@ -478,6 +487,8 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
           if ((mainKind === "notes") && results?.[0]) {
             const viewSettings = (store.getState() as unknown as StoreState).settings.viewSettings;
             store.dispatch(setSettings({ viewSettings: { ...viewSettings, filterBy: results[0].colUid } }) as any);
+          } else if ((mainKind === "bookmarks") && results?.[0]) {
+            store.dispatch(setSettings({ bookmarksFilter: results[0].colUid }) as any);
           }
           navigation.navigate("Root", { screen: kinds[mainKind].screen });
         }} />}
@@ -493,6 +504,10 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
     } else if (kind === "tasks") {
       const due = entries.filter((x) => x.date).length;
       return `${due} with due dates`;
+    } else if (kind === "bookmarks") {
+      // (the folders they were in are their tags)
+      const tagged = entries.filter((x) => x.bookmark?.tags.length).length;
+      return (tagged) ? `${tagged} with tags` : "";
     }
     return "";
   };
@@ -518,7 +533,7 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
           </View>
           {!!error && <Text style={{ color: theme.colors.error }} accessibilityLiveRegion="polite">{error}</Text>}
           <View style={styles.kinds}>
-            {[[".ics", "Events and tasks"], [".vcf", "Contacts"], [".md .txt", "Notes, one per file"]].map(([ext, what]) => (
+            {[[".ics", "Events and tasks"], [".vcf", "Contacts"], [".md .txt", "Notes, one per file"], [".html", "Bookmarks, exported from a browser"]].map(([ext, what]) => (
               <View key={ext} style={[styles.kindBox, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
                 <Text style={{ fontFamily: mono, fontSize: 13, color: theme.colors.text }}>{ext}</Text>
                 <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{what}</Text>
@@ -754,7 +769,7 @@ const styles = StyleSheet.create({
   },
   type: {
     flexGrow: 1,
-    flexBasis: 110,
+    flexBasis: 90,
     minHeight: 72,
     borderWidth: 1,
     borderRadius: 11,

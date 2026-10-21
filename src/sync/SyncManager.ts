@@ -16,7 +16,7 @@ import { startTask, arrayToChunkIterator } from "../helpers";
 
 const cachedSyncManager = new Map<string, SyncManager>();
 export class SyncManager {
-  private COLLECTION_TYPES = [C.colType, ...C.pimTypes];
+  private COLLECTION_TYPES = C.collectionTypes;
   private BATCH_SIZE = 20;
 
   public static getManager(etebase: Etebase.Account) {
@@ -76,7 +76,11 @@ export class SyncManager {
 
     const colMgr = etebase.getCollectionManager();
     const limit = this.BATCH_SIZE;
-    let stoken = syncGeneral?.stoken;
+    // A type that wasn't synced before (e.g. bookmarks after an update, or the calendars of an install of
+    // etesync-notes) also has the collections that are older than the stoken, so then all of them are
+    // listed again (their items are fetched from where they were, with their own stokens)
+    const sameTypes = (syncGeneral?.types ?? [C.colType]).join() === this.COLLECTION_TYPES.join();
+    let stoken = (sameTypes) ? syncGeneral?.stoken : undefined;
     let done = false;
     while (!done) {
       const collections = await colMgr.list(this.COLLECTION_TYPES, { stoken, limit });
@@ -109,8 +113,8 @@ export class SyncManager {
       stoken = collections.stoken;
     }
 
-    if (syncGeneral?.stoken !== stoken) {
-      store.dispatch(setSyncGeneral(stoken ?? null));
+    if ((syncGeneral?.stoken !== stoken) || !sameTypes) {
+      store.dispatch(setSyncGeneral(stoken ?? null, this.COLLECTION_TYPES));
     }
     return true;
   }
@@ -170,6 +174,11 @@ export class SyncManager {
       if (identical && !local.isDeleted) {
         const remoteContent = await remote.getContent(Etebase.OutputFormat.String);
         identical = (remoteContent === localContent) && (remote.getMeta().name === localMeta.name);
+        // (the note and the tags of a bookmark are in its meta)
+        if (identical && (col.getCollectionType() === C.bookmarkColType)) {
+          const withoutTime = (meta: Etebase.ItemMetadata) => JSON.stringify({ ...meta, mtime: undefined });
+          identical = withoutTime(remote.getMeta()) === withoutTime(localMeta);
+        }
       }
 
       // Calendars, task lists and address books get no copy: a copy would be a second event (or

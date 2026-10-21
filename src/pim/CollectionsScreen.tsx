@@ -23,7 +23,7 @@ import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
 import { fonts, useTheme } from "../theme";
 import {
-  accessNames, CollectionInfo, deleteCollection, exportCollection, fetchUserKey, inviteMember, Kind, kindOrder, kinds,
+  accessNames, CollectionInfo, deleteCollection, exportCollection, exportExtension, fetchUserKey, inviteMember, Kind, kindOrder, kinds,
   leaveCollection, listMembers, Member, removeMember, saveCollection, setMemberAccess, useCollectionInfos,
 } from "./collections";
 import { Button, DialogInput, Labelled, SwatchPicker, useDialogs } from "./Dialogs";
@@ -83,7 +83,7 @@ export function CollectionMenu(props: { info: CollectionInfo, onEdit?: () => voi
           close();
           navigation.navigate("Root", { screen: "Collections", params: { colUid: info.colUid, share: true } });
         }} />}
-        <MenuItem icon="tray-arrow-down" title={`Export as .${(info.kind === "contacts") ? "vcf" : (info.kind === "notes") ? "md" : "ics"}`} onPress={async () => {
+        <MenuItem icon="tray-arrow-down" title={`Export as .${exportExtension(info.kind)}`} onPress={async () => {
           close();
           const n = await exportCollection(etebase, info.colUid);
           dispatch(pushMessage({ message: `Exported ${n} ${kind.unit}`, severity: "success" }) as any);
@@ -450,7 +450,7 @@ export default function CollectionsScreen(props: { route: RouteProp<RootStackPar
             <Text style={{ fontSize: 12, fontFamily: fonts.semibold, letterSpacing: 0.7, textTransform: "uppercase", color: theme.colors.textMuted }}>Settings</Text>
             <Text style={{ fontSize: 26, fontFamily: fonts.semibold, color: theme.colors.text }} accessibilityRole="header">Collections</Text>
             <Text style={{ color: theme.colors.textMuted }}>
-              Calendars, address books, task lists and notebooks for <Text style={{ fontFamily: fonts.medium, color: theme.colors.textSecondary }}>{etebase.user.username}</Text> on <Text style={{ fontFamily: mono, color: theme.colors.textSecondary }}>{host(etebase.serverUrl)}</Text>.
+              Calendars, address books, task lists, notebooks and bookmark lists for <Text style={{ fontFamily: fonts.medium, color: theme.colors.textSecondary }}>{etebase.user.username}</Text> on <Text style={{ fontFamily: mono, color: theme.colors.textSecondary }}>{host(etebase.serverUrl)}</Text>.
             </Text>
           </View>
           <Button label="Import…" icon="tray-arrow-up" onPress={() => dialogs.importFiles()} />

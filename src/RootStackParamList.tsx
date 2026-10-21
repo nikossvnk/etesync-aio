@@ -35,8 +35,10 @@ export type RootStackParamList = {
   Contacts: undefined;
   Contact: { colUid: string, itemUid: string };
   ContactEdit: { colUid?: string, itemUid?: string } | undefined;
+  // (with a bookmark: it's open, with a url: a new one with it)
+  Bookmarks: { colUid?: string, itemUid?: string, url?: string } | undefined;
   SearchAll: undefined;
-  Collections: { colUid?: string, kind?: "calendar" | "contacts" | "tasks" | "notes", share?: boolean } | undefined;
+  Collections: { colUid?: string, kind?: "calendar" | "contacts" | "tasks" | "notes" | "bookmarks", share?: boolean } | undefined;
   Invitations: undefined;
   Settings: undefined;
   Password: undefined;
@@ -46,8 +48,8 @@ export type RootStackParamList = {
   "404": undefined;
 };
 
-// The screens of the calendar, the tasks and the contacts (and their parts)
-export const pimScreens: string[] = ["Calendar", "EventEdit", "Tasks", "TaskEdit", "Contacts", "Contact", "ContactEdit", "SearchAll"];
+// The screens of the calendar, the tasks, the contacts and the bookmarks (and their parts)
+export const pimScreens: string[] = ["Calendar", "EventEdit", "Tasks", "TaskEdit", "Contacts", "Contact", "ContactEdit", "Bookmarks", "SearchAll"];
 
 // The settings (and their parts) and the account's screens, which aren't about notes either
 export const accountScreens: string[] = ["Settings", "About", "Password", "DebugLogs", "Invitations", "Collections", "CollectionChangelog"];

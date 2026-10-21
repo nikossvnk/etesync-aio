@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 // Importing files (like the import of the web app, and notes too): .ics files have events and tasks,
-// .vcf files contacts, and .md or .txt files are a note each. The files are read here, on the
-// device; what's in them is saved (encrypted) like everything else.
+// .vcf files contacts, .md or .txt files are a note each, and .html files are the bookmarks that a
+// browser exported. The files are read here, on the device; what's in them is saved (encrypted) like
+// everything else.
 
 import * as Etebase from "etebase";
 import * as ICAL from "ical.js";
@@ -12,6 +13,7 @@ import * as uuid from "uuid";
 import { store, StoreState } from "../store";
 import { saveItemsLocally } from "../sync/SyncManager";
 import { createCollection, Kind, kinds } from "./collections";
+import { BookmarkMetadata, comparableUrl, metaOf, ParsedBookmark, readBookmarksHtml } from "../bookmarks";
 
 export interface ImportFile {
   name: string;
@@ -20,14 +22,17 @@ export interface ImportFile {
 }
 
 export interface Entry {
-  // The iCalendar UID (for notes, the title), which is how items that are there already are found
+  // The iCalendar UID (for notes, the title, for bookmarks, the link as it's compared), which is how
+  // items that are there already are found
   uid: string;
   title: string;
   // The item's content: a calendar with the event (or task) and the time zones it uses, a vCard,
   // or the text of a note
   content: string;
-  // When it is (events), or when it's due (tasks)
+  // When it is (events), when it's due (tasks), or when it was saved (bookmarks)
   date?: Date;
+  // A bookmark's details, which are in its meta
+  bookmark?: ParsedBookmark;
 }
 
 export interface Unreadable {
@@ -46,10 +51,11 @@ export interface Parsed {
 const calendarExt = /\.(ics|ical|ifb|icalendar)$/i;
 const contactsExt = /\.(vcf|vcard)$/i;
 const notesExt = /\.(md|markdown|txt)$/i;
-export const acceptedFiles = [".ics", ".ical", ".vcf", ".md", ".markdown", ".txt", "text/calendar", "text/vcard", "text/markdown", "text/plain"];
+const bookmarksExt = /\.(html|htm)$/i;
+export const acceptedFiles = [".ics", ".ical", ".vcf", ".md", ".markdown", ".txt", ".html", ".htm", "text/calendar", "text/vcard", "text/markdown", "text/plain", "text/html"];
 
 export function isAccepted(name: string) {
-  return calendarExt.test(name) || contactsExt.test(name) || notesExt.test(name);
+  return calendarExt.test(name) || contactsExt.test(name) || notesExt.test(name) || bookmarksExt.test(name);
 }
 
 // The line of the file where something is (e.g. "UID:..."), counting from 1
@@ -151,8 +157,28 @@ function readContacts(file: ImportFile, parsed: Parsed) {
   }
 }
 
+function readBookmarks(file: ImportFile, parsed: Parsed) {
+  const { bookmarks, skipped } = readBookmarksHtml(file.text);
+  if ((bookmarks.length === 0) && (skipped.length === 0)) {
+    parsed.unreadable.push({ file: file.name, what: "The file", reason: "has no bookmarks (export them from the browser's bookmark manager as an HTML file)" });
+    return;
+  }
+  for (const x of skipped) {
+    parsed.unreadable.push({ file: file.name, what: `Bookmark “${x.title || "(no title)"}”`, reason: x.reason, line: x.line });
+  }
+  for (const bookmark of bookmarks) {
+    parsed.entries.bookmarks.push({
+      uid: comparableUrl(bookmark.url),
+      title: bookmark.title || bookmark.url,
+      content: bookmark.url,
+      date: (bookmark.created) ? new Date(bookmark.created) : undefined,
+      bookmark,
+    });
+  }
+}
+
 export function readFiles(files: ImportFile[]): Parsed {
-  const parsed: Parsed = { files, entries: { calendar: [], tasks: [], contacts: [], notes: [] }, unreadable: [] };
+  const parsed: Parsed = { files, entries: { calendar: [], tasks: [], contacts: [], notes: [], bookmarks: [] }, unreadable: [] };
   for (const file of files) {
     if (calendarExt.test(file.name)) {
       readCalendar(file, parsed);
@@ -161,8 +187,10 @@ export function readFiles(files: ImportFile[]): Parsed {
     } else if (notesExt.test(file.name)) {
       const title = file.name.replace(/\.[^.]+$/, "");
       parsed.entries.notes.push({ uid: title, title, content: file.text });
+    } else if (bookmarksExt.test(file.name)) {
+      readBookmarks(file, parsed);
     } else {
-      parsed.unreadable.push({ file: file.name, what: "The file", reason: "isn't of a kind that can be imported (.ics, .vcf, .md or .txt)" });
+      parsed.unreadable.push({ file: file.name, what: "The file", reason: "isn't of a kind that can be imported (.ics, .vcf, .md, .txt or .html)" });
     }
   }
   return parsed;
@@ -170,7 +198,8 @@ export function readFiles(files: ImportFile[]): Parsed {
 
 // Where the entries of a kind go: a collection, or a new one with that name
 export type Destination = { colUid: string } | { newName: string };
-// What happens with ones that are there already (with the same UID, or the same title for notes)
+// What happens with ones that are there already (with the same UID, the same title for notes, or the
+// same link for bookmarks)
 export type Duplicates = "skip" | "update" | "copy";
 
 export interface KindResult {
@@ -201,7 +230,7 @@ export async function runImport(etebase: Etebase.Account, parsed: Parsed, destin
     const col = colMgr.cacheLoad(cachedCol.cache);
     const itemMgr = colMgr.getItemManager(col);
 
-    // The items that are there already, by their UID (for notes, their title)
+    // The items that are there already, by their UID (for notes, their title, for bookmarks, their link)
     const existing = new Map<string, Etebase.Item>();
     for (const cached of state.allCache.items.get(colUid)?.values() ?? []) {
       if (cached.isDeleted) {
@@ -210,6 +239,8 @@ export async function runImport(etebase: Etebase.Account, parsed: Parsed, destin
       const item = itemMgr.cacheLoad(cached.cache);
       if (kind === "notes") {
         existing.set(cached.meta.name ?? "", item);
+      } else if (kind === "bookmarks") {
+        existing.set(comparableUrl((cached.meta as { url?: string }).url ?? ""), item);
       } else {
         const content = (await item.getContent(Etebase.OutputFormat.String)).replace(/\r?\n[ \t]/g, "");
         const m = /^UID:(.*)$/m.exec(content);
@@ -226,11 +257,23 @@ export async function runImport(etebase: Etebase.Account, parsed: Parsed, destin
       const there = existing.get(entry.uid);
       if (there && (duplicates === "skip")) {
         result.skipped++;
+      } else if (there && (duplicates === "update") && entry.bookmark) {
+        // (it keeps when it was saved first)
+        const before = there.getMeta() as Partial<BookmarkMetadata>;
+        const meta = { ...before, ...metaOf(entry.bookmark, before.created ?? entry.bookmark.created ?? mtime, before.savedFrom ?? "import") };
+        there.setMeta(meta);
+        await there.setContent(meta.url);
+        items.push(there);
+        result.updated++;
       } else if (there && (duplicates === "update")) {
         await there.setContent(entry.content);
         there.setMeta({ ...there.getMeta(), mtime });
         items.push(there);
         result.updated++;
+      } else if (entry.bookmark) {
+        const meta = metaOf(entry.bookmark, entry.bookmark.created ?? mtime, "import");
+        items.push(await itemMgr.create(meta, meta.url));
+        result.added++;
       } else {
         const copy = !!there;
         const id = (copy && (kind !== "notes")) ? uuid.v4() : entry.uid;

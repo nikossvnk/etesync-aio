@@ -50,7 +50,8 @@ you log in), or to update an installed one, run ./install.sh. ./install.sh --uni
 again. It needs Python 3 (Linux; systemd is optional, SERVICE=no installs it without).
 
 Made from $SOURCE
-Licence: GPL-3.0, and the files taken from etesync-web are AGPL-3.0 (see LICENSES).
+Licence: GPL-3.0, except the files taken from etesync-web, which are AGPL-3.0, so the app as a
+whole is under the AGPL-3.0. Both texts are in LICENSES.
 README
 
 # The same archive for the same commit: sorted, without owners, and with the time of the commit

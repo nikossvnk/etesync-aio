@@ -1,7 +1,7 @@
 import * as React from "react";
 import { StyleSheet, FlatList, Platform, View, BackHandler } from "react-native";
 import { Appbar as PaperAppbar, List, FAB, Text } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useDispatch, useSelector } from "react-redux";
 import * as Etebase from "etebase";

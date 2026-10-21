@@ -8,7 +8,7 @@
 import * as React from "react";
 import { Linking, Platform, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { ActivityIndicator, Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 
 import { useDeviceBreakpoint } from "../helpers";

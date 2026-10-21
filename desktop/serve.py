@@ -73,6 +73,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # Set by main(): the host names (with the port) that requests have to be for. Others are refused,
     # so that a web site can't reach this server through a DNS name it points to 127.0.0.1.
     allowed_hosts = set()
+    # (the launcher, etesync-desktop, tells by it that it's this server answering on the port)
+    server_version = "EteSyncDesktop"
 
     def do_GET(self):
         if self.path.startswith("/bookmark-title?"):

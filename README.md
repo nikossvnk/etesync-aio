@@ -55,7 +55,7 @@ themselves are not changed.
   a bookmark is saved (see below).
 - **Titles of bookmarks.** Only when "Get title" (under a bookmark's link) is pressed, its page is
   fetched to read its title, like in EteSync Notes. Browsers don't let the app
-  read other sites, so the local web server (`local-web/serve.py`) does it, on this computer: it
+  read other sites, so the local web server (`desktop/serve.py`) does it, on this computer: it
   fetches the page directly from the site (not through the Etebase server), and gives the app only
   the title. The site sees this computer's address, like when the link is opened, but no cookies or
   where it came from. Only the app can ask for it (it has to send a header that other sites can't),
@@ -67,7 +67,7 @@ themselves are not changed.
   the lists need: the titles of notes, the names of notebooks, calendars, task lists, address
   books and bookmark lists, and the bookmarks (their link, title, note and tags are their meta, as
   in EteSync Notes, so that they're listed without decrypting each one). Logging out removes all of it. A browser has no safe place for keys, so whoever can use the
-  browser profile can use the account (see `local-web/README.md`).
+  browser profile can use the account (see `desktop/README.md`).
 - **Nothing in synced data runs as code.** Everything is shown as text (no HTML). Links from synced
   data (contacts' web sites, links in notes) are only opened when they are web, email or phone links.
   The local web server sends a Content-Security-Policy that only lets the app's own code run, keeps
@@ -79,6 +79,17 @@ themselves are not changed.
 - **Dependencies:** `npm audit` reports issues in the build tools (Expo's and React Native's command
   line tools, Metro), which run when building and aren't part of the app. Fixing them needs major
   upgrades of Expo.
+
+## Installing it
+
+On Linux, with Python 3 (see `desktop/README.md`, also for running it without installing):
+
+```
+curl -fsSL https://raw.githubusercontent.com/nikossvnk/etesync-aio/main/desktop/get.sh | sh
+```
+
+It installs the latest release, the built app, from this repository's GitHub releases, which the
+release workflow makes for each tag.
 
 ## Running it
 

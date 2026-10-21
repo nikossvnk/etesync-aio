@@ -5,7 +5,7 @@ import * as React from "react";
 import { View, ViewProps, StyleSheet } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import { useTheme } from "../theme";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Link from "./Link";
 
 type PropsType = ViewProps & {

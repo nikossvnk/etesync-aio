@@ -8,7 +8,7 @@
 import * as React from "react";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Paragraph, Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { useDispatch } from "react-redux";
 import * as Etebase from "etebase";

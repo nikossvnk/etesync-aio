@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Opens EteSync Desktop: starts its server when it isn't running (when it's installed without the
+# service, or not installed at all, run from an unpacked release), then opens the app's window.
+#
+#   ./etesync-desktop            # open it
+#   ./etesync-desktop --start    # only start the server
+#   ./etesync-desktop --stop     # stop the server this started (not the service's)
+#   ./etesync-desktop --status   # whether its server runs: "ours", "other" (another program has the port) or "none"
+#
+# The settings install.sh chose (PORT, BROWSER, LOW_MEMORY) are in the settings file next to this,
+# and can also be given as environment variables. A server this starts keeps running in the
+# background (until --stop, or the computer is turned off), so the window opens at once the next time.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+# (environment variables first, then the settings)
+given_port="${PORT:-}" given_browser="${BROWSER:-}" given_low_memory="${LOW_MEMORY:-}"
+# shellcheck source=/dev/null
+[ -f "$HERE/settings" ] && . "$HERE/settings"
+PORT="${given_port:-${PORT:-8092}}"
+BROWSER="${given_browser:-${BROWSER:-}}"
+LOW_MEMORY="${given_low_memory:-${LOW_MEMORY:-1}}"
+URL="http://localhost:$PORT"
+PID_FILE="$HERE/serve.pid"
+
+# Whether this app's server answers on the port (see --status)
+server() {
+    python3 - "$URL/" <<'PY'
+import sys, urllib.error, urllib.request
+try:
+    response = urllib.request.urlopen(sys.argv[1], timeout=2)
+except urllib.error.HTTPError as e:
+    response = e
+except OSError:
+    print("none")
+    sys.exit()
+print("ours" if (response.headers.get("Server") or "").startswith("EteSyncDesktop") else "other")
+PY
+}
+
+start() {
+    case "$(server)" in
+        ours) return ;;
+        other)
+            echo "Another program uses port $PORT. Install EteSync Desktop on another one, e.g.: PORT=8093 ./install.sh" >&2
+            exit 1 ;;
+    esac
+    command -v python3 >/dev/null 2>&1 || { echo "Missing python3, it's needed to run EteSync Desktop" >&2; exit 1; }
+    # (setsid: in a session of its own, so that it keeps running when the terminal or menu that
+    # started this goes away)
+    setsid python3 "$HERE/serve.py" --port "$PORT" --dir "$HERE/site" >> "$HERE/serve.log" 2>&1 < /dev/null &
+    echo $! > "$PID_FILE"
+    for _ in $(seq 1 20); do
+        [ "$(server)" = "ours" ] && return
+        sleep 0.5
+    done
+    echo "EteSync Desktop's server didn't start, see $HERE/serve.log" >&2
+    exit 1
+}
+
+stop() {
+    if [ -f "$PID_FILE" ] && kill "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "Stopped EteSync Desktop's server"
+    elif [ "$(server)" = "ours" ]; then
+        echo "EteSync Desktop runs as a service, stop it with: systemctl --user stop etesync-aio-web"
+    fi
+    rm -f "$PID_FILE"
+}
+
+open_window() {
+    # A browser that can open it in its own window (an "app" window, without tabs and address bar)
+    local browser="${BROWSER:-}" b
+    if [ -z "$browser" ]; then
+        for b in chromium-browser chromium google-chrome-stable google-chrome brave-browser microsoft-edge firefox; do
+            if command -v "$b" >/dev/null 2>&1; then
+                browser="$b"
+                break
+            fi
+        done
+    fi
+    # Chromium-based browsers run the window in a browser of its own, so these leave out what it
+    # doesn't need: a spare page process kept ready, more than the window's two (the app and the
+    # window's frame), and background downloads, updates, sync, translation, casting and the
+    # back/forward cache. They keep the profile, so the app's data stays.
+    local low_memory=()
+    if [ "${LOW_MEMORY:-1}" != "0" ]; then
+        low_memory=(--renderer-process-limit=2 --disable-background-networking --disable-component-update --disable-sync --disable-default-apps --disable-features=SpareRendererForSitePerProcess,Translate,OptimizationHints,MediaRouter,BackForwardCache)
+    fi
+    case "$(basename "${browser:-xdg-open}")" in
+        chromium*|google-chrome*|brave*|microsoft-edge*) exec "$browser" "${low_memory[@]}" --app="$URL" ;;
+        firefox*) exec "$browser" --new-window "$URL" ;;
+        *) exec xdg-open "$URL" ;;
+    esac
+}
+
+case "${1:-}" in
+    --start) start ;;
+    --stop) stop ;;
+    --status) server ;;
+    "") start; open_window ;;
+    *) echo "Unknown option $1 (there are --start, --stop and --status)" >&2; exit 1 ;;
+esac

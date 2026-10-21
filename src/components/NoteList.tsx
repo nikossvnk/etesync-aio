@@ -2,7 +2,7 @@ import * as React from "react";
 import { DateFormats, formatChanged, useDateFormats } from "../pim/format";
 import { FlatList, StyleSheet, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useDispatch, useSelector } from "react-redux";
 import * as Etebase from "etebase";
 

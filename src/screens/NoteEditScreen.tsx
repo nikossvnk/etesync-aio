@@ -5,7 +5,7 @@ import * as React from "react";
 import * as Etebase from "etebase";
 import { View, ViewProps, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, GestureResponderEvent } from "react-native";
 import { Paragraph, Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { fonts, useTheme } from "../theme";
 import { useNavigation, RouteProp } from "@react-navigation/native";
 import { useDateFormats } from "../pim/format";

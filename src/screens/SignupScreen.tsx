@@ -7,7 +7,7 @@ import * as Etebase from "etebase";
 
 import { Linking, Platform, View, TextInput as NativeTextInput } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { AuthField, AuthHeading, AuthInput, AuthLayout, ErrorBox, PasswordField, PrimaryButton, ServerBox } from "../components/Auth";
 import { fonts, useTheme } from "../theme";

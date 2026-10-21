@@ -5,7 +5,7 @@ import * as React from "react";
 import { useSelector } from "react-redux";
 import { DrawerNavigationProp, useDrawerStatus } from "@react-navigation/drawer";
 import { Linking, View, StyleSheet } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Text, Paragraph, TouchableRipple } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

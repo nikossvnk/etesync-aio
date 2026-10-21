@@ -303,7 +303,7 @@ export async function tagBookmarks(etebase: Etebase.Account, bookmarks: Bookmark
 
 // The title of a web page, read from it. This contacts the site, so it's only done when asked for (the
 // "Get title" button), like in EteSync Notes. Browsers don't let a page read other sites, so on the web the local server reads it (see
-// local-web/serve.py); without one (e.g. while developing) there's no title, and the site is shown.
+// desktop/serve.py); without one (e.g. while developing) there's no title, and the site is shown.
 export async function fetchTitle(url: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);

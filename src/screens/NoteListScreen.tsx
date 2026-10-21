@@ -4,7 +4,7 @@
 import * as React from "react";
 import { BackHandler, StyleSheet, View, Platform } from "react-native";
 import { FAB, Paragraph, Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useSelector, useDispatch } from "react-redux";
 

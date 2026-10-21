@@ -5,7 +5,7 @@ import * as React from "react";
 import { Linking, PanResponder, Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { Divider, IconButton, Text, TouchableRipple } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useDispatch, useSelector } from "react-redux";
 
 import { StoreState } from "../store";

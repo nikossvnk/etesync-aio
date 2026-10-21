@@ -1,6 +1,6 @@
 import * as React from "react";
 import { DrawerItem as BaseDrawerItem } from "@react-navigation/drawer";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../theme";
 import Clickable from "./Clickable";
 

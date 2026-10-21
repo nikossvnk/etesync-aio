@@ -1,0 +1,38 @@
+# Builds a release of EteSync Desktop for each tag (v1.2.0, …) and puts it on the tag's GitHub
+# release: etesync-desktop-VERSION.tar.gz, its checksum, and an attestation that it was built here
+# from that commit (gh attestation verify etesync-desktop-VERSION.tar.gz --repo nikossvnk/etesync-aio).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit -p . && npx eslint src
+      - run: desktop/build-release.sh "$GITHUB_REF_NAME"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.tar.gz.sha256 --verify-tag \
+            --title "EteSync Desktop ${GITHUB_REF_NAME#v}" \
+            --notes "To install it, or to update it: \`curl -fsSL https://raw.githubusercontent.com/nikossvnk/etesync-aio/main/desktop/get.sh | sh\` (Linux, needs Python 3). Or download the .tar.gz and unpack it: ./etesync-desktop runs it without installing, ./install.sh installs it."

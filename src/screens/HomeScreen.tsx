@@ -4,7 +4,7 @@
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { RootStackParamList } from "../RootStackParamList";

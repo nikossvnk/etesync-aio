@@ -4,7 +4,7 @@
 import * as React from "react";
 import { ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { IconButton, Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigation } from "@react-navigation/native";
 import * as ICAL from "ical.js";

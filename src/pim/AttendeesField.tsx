@@ -7,7 +7,7 @@
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as ICAL from "ical.js";
 
 import { useCredentials } from "../credentials";

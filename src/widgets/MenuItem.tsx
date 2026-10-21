@@ -1,5 +1,5 @@
 import * as React from "react";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { ViewStyle } from "react-native";
 import { Menu } from "react-native-paper";
 import { useTheme } from "../theme";

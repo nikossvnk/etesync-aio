@@ -8,7 +8,7 @@
 import * as React from "react";
 import { PanResponder, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { fonts, useTheme } from "../theme";
 import { DateFormats } from "./format";

@@ -43,6 +43,14 @@ export default tseslint.config(
       "@typescript-eslint/ban-ts-comment": "off",
       // Images and other assets are loaded with require() in React Native
       "@typescript-eslint/no-require-imports": "off",
+      // The index files of these packages pull in every icon set or font weight, which the web build
+      // then copies (several MB the app never loads)
+      "no-restricted-imports": ["error", {
+        "paths": [
+          { "name": "@expo/vector-icons", "message": "Import the icon set's own file, e.g. @expo/vector-icons/MaterialCommunityIcons" },
+          { "name": "@expo-google-fonts/ibm-plex-sans", "message": "Import each weight's own file, e.g. @expo-google-fonts/ibm-plex-sans/400Regular" },
+        ],
+      }],
       "@stylistic/member-delimiter-style": ["error", {
         "multiline": {
           "delimiter": "semi",

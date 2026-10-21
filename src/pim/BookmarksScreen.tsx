@@ -8,7 +8,7 @@
 import * as React from "react";
 import { Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { IconButton, Snackbar, Text, TouchableRipple } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { RouteProp } from "@react-navigation/native";
 import { useDispatch, useSelector } from "react-redux";
 

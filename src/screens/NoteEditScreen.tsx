@@ -23,7 +23,7 @@ import Markdown from "../widgets/Markdown";
 import { useSelector, useDispatch } from "react-redux";
 import { pushMessage, setCacheItem, setSettings, setSyncItem, unsetCacheItem } from "../store/actions";
 import { newNotes, openInEditor } from "../newNotes";
-import { moveNote, nameFromContent, noteName, untitled } from "../notes";
+import { isPinned, moveNote, nameFromContent, noteName, setPinned, untitled } from "../notes";
 import { requestSync, saveItemsLocally } from "../sync/SyncManager";
 import LoadingIndicator from "../widgets/LoadingIndicator";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
@@ -152,6 +152,8 @@ export default function NoteEditScreen(props: PropsType) {
           onSave={onSave}
           onDelete={() => setNoteDeleteDialogShow(true)}
           onShare={onShare}
+          pinned={!!cacheItem && isPinned(cacheItem)}
+          onPin={(pinned) => setPinned(etebase!, [`${colUid}/${itemUid}`], pinned)}
           changed={changed}
         />
       ),
@@ -500,14 +502,17 @@ interface RightActionViewProps {
   onSave: () => void;
   onDelete: () => void;
   onShare: () => void;
+  pinned: boolean;
+  onPin: (pinned: boolean) => void;
 }
 
-function RightAction({ viewMode, setViewMode, onSave, onDelete, onShare, changed }: RightActionViewProps) {
+function RightAction({ viewMode, setViewMode, onSave, onDelete, onShare, pinned, onPin, changed }: RightActionViewProps) {
 
   return (
     <View style={{ flexDirection: "row" }}>
       <AppbarButton icon={viewMode ? "pencil" : "eye"} title="View mode" onPress={() => setViewMode(!viewMode)} />
       <AppbarButton icon="content-save" title="Save" disabled={!changed} onPress={onSave} />
+      <AppbarButton icon={(pinned) ? "pin" : "pin-outline"} title={(pinned) ? "Unpin note" : "Pin note"} pressed={pinned} onPress={() => onPin(!pinned)} />
       {(canShare()) ? (
         <AppbarButton icon="share-variant" title="Share" onPress={onShare} />
       ) : null}

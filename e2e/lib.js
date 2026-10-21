@@ -97,6 +97,14 @@ exports.api = {
     await etebase.logout();
     return content;
   },
+  // The metadata of the note with the name in the notebook (that isn't deleted), if there's one
+  async noteMeta(notebookName, name) {
+    const etebase = await this.login();
+    const col = await this.notebook(etebase, notebookName);
+    const item = (await this.items(etebase, col)).find((x) => !x.isDeleted && x.getMeta().name === name);
+    await etebase.logout();
+    return item?.getMeta();
+  },
   async notebook(etebase, name) {
     const colMgr = etebase.getCollectionManager();
     const existing = (await this.notebooks(etebase)).find((x) => !x.isDeleted && x.getMeta().name === name);

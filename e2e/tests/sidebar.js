@@ -1,6 +1,6 @@
 // Wide screens: three columns, the sidebar (account, search, notebooks, settings), the notes, and the
 // open note. There's no drawer, the sidebar has what it has.
-const { launch, session, run, check, api, unique } = require("../lib");
+const { launch, session, run, check, api, unique, config } = require("../lib");
 run(async () => {
   const n = unique();
   const other = "Sidebar " + n;
@@ -46,7 +46,7 @@ run(async () => {
 
   check("the sidebar and the notes are shown on a wide screen", await sidebar.count() === 1 && await column.count() === 1);
   check("there's no drawer menu button", await A.btn(/^main menu$/i).count() === 0);
-  check("the sidebar shows the account", (await sidebar.innerText()).includes("e2e-tester"));
+  check("the sidebar shows the account", (await sidebar.innerText()).includes(config.username));
   check("and the notebooks", await shown("Notebook My Notes") && await shown("Notebook " + other));
   check("the notes column lists the notes of all notebooks", await listed("First " + n) && await listed("Third " + n));
   check("next to it nothing is open yet", (await A.p.getByText("No note open").locator("visible=true").count()) === 1);

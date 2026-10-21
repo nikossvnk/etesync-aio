@@ -22,6 +22,7 @@ themselves are not changed.
 | | |
 |---|---|
 | Sidebar | The account, one search for notes, events, tasks and contacts, and a "+" to make any of them (and a bookmark). The five sections as equals, with live counts (notes, bookmarks, events today, tasks due). Under them a list about the open section: notebooks, bookmark lists, calendars to show and hide (and the birthdays of contacts), task lists, address books and contact groups. Settings, the sync state and hiding the sidebar on one row. |
+| Notes | The notes column next to the sidebar (on phones the list), with the notebook's notes or all of them. Pinned notes are shown above the others, as cards two per row (an odd last one as wide as the row, with the beginning of the note), under a "Pinned" title that folds them away, and the others under "Other notes". Notes are pinned with the pin in the bar of the open note, or several at once: selected with ctrl-click (a long press on phones), then "Pin selected". The pin is in the note's (encrypted) metadata, the same as in EteSync Notes, and pinning doesn't change when the note was modified. |
 | Bookmarks | A link is saved by pasting it in the bar at the top and pressing Enter (or dropping it from the browser): it's saved right away (shown by its site until it has a title, which can be read from the page with "Get title", see below). The list: each bookmark's site (as a letter), title, site and note, tags and when it was saved, with buttons to open it in the browser and to delete it; search, sorting (newest, oldest, title, site) and the tags to filter by. Ticked bookmarks can be moved to another list, tagged or deleted together. Next to the list the chosen one is edited (link, title, note, tags, list; open, copy the link, delete), with when and where it was saved (on Android, shared to the Android app, on a computer, or imported), and "New bookmark" opens it empty. Deleting shows an Undo message instead of asking. The lists are in the sidebar, with "All bookmarks". |
 | Calendar | Day, week, month and agenda views (weeks start on Monday or Sunday, by the setting). The month: weekends apart, events with a time as a dot and the time, all day ones as bars joining over their days; the chosen day's events next to it (place, who comes) and what's coming up. Events of several days are bars over their days (on lines of their own when they overlap, with an arrow where they go on into the next week). The week: the hours of seven days, the all day events as bars over them, the chosen event's details next to it. The day: the hours with each event's place and who comes, a small month to go to another day, and the tasks due that day. The agenda: the next four weeks by day, the next event marked, repeating events hidden unless asked for. Events can be dragged to another time (and day), and their lower edge to change when they end. Events have a time zone (like in the web app): their times are in it, and the editor says when they are where you are. Who's invited (the event's attendees) is shown. Choosing an empty hour makes an event then. |
 | Tasks | Adding from the top, the tasks in Overdue, Today, Upcoming and No date, today's progress. Each shows its list, its subtasks, a flag when it's important, and when it's due. Next to them on wide screens the chosen task's details: due, repeat, list, priority, its subtasks to tick off and add, and its notes. Repeating tasks get their next time when done. An editor for all of it. |
@@ -37,7 +38,9 @@ themselves are not changed.
 - `src/sync/SyncManager.ts`: syncs the five collection types instead of one. When the types it
   syncs change (e.g. an update brings a new one), all collections are listed again, so the older ones
   of the new type are found too. A conflict on an event, task, contact or bookmark keeps the server's version (a "conflict copy", like notes get, would be a
-  second event with the same UID).
+  second event with the same UID). A note changed here and elsewhere gets a conflict copy only when
+  its name or content was changed here (the revision the change was made to is looked up to tell),
+  and a pin made here is kept on the version from elsewhere, as in EteSync Notes.
 - `src/pim/`: the new screens, `data.ts` (reading and saving items through the notes' offline
   queue) and the model from etesync-web.
 
@@ -87,6 +90,9 @@ npx expo export -p web --output-dir web-build  # a build, e.g. served by e2e/ser
 
 ## Tests
 
+`e2e/tests/pinned-notes.js` checks pinning notes on phones and wide screens (on the server: the pin,
+that the modification time stays, unpinning, another device, pinning offline while the note is
+changed elsewhere), the cards, and folding them away.
 `e2e/tests/bookmarks.js` checks the bookmarks on wide screens (saving a pasted link, "Get title" and that nothing else contacts the page, where it was saved,
 editing, tags, moving, deleting with undo, importing and exporting a browser's bookmark file).
 `e2e/tests/pim.js` (with the rest of the notes' browser tests, see `e2e/README.md`) makes a new

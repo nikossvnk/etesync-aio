@@ -22,7 +22,7 @@ import AppbarButton from "../widgets/AppbarButton";
 import { DefaultNavigationProp } from "../RootStackParamList";
 import { fonts, useTheme } from "../theme";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
-import { deleteNotes } from "../notes";
+import { deleteNotes, isPinned, setPinned } from "../notes";
 
 interface PropsType {
   active: boolean;
@@ -60,6 +60,12 @@ export default function NoteListScreen(props: PropsType) {
   const [selection, setSelection] = React.useState<Set<string>>(() => new Set());
   const [deleteShown, setDeleteShown] = React.useState(false);
   const selecting = selection.size > 0;
+  // Whether all of the selected notes are pinned, so that the button unpins them
+  const allPinned = useSelector((state: StoreState) => selecting && [...selection].every((note) => {
+    const [colUid, itemUid] = note.split("/");
+    const item = state.cache.items.get(colUid)?.get(itemUid);
+    return !!item && isPinned(item);
+  }));
 
   const select = React.useCallback((note: string) => {
     setSelection((current) => {
@@ -122,7 +128,17 @@ export default function NoteListScreen(props: PropsType) {
           <AppbarButton icon="close" title="Clear selection" onPress={() => setSelection(new Set())} />
         ),
         headerRight: () => (
-          <AppbarButton icon="delete" title="Delete selected" onPress={() => setDeleteShown(true)} />
+          <View style={{ flexDirection: "row" }}>
+            <AppbarButton
+              icon={(allPinned) ? "pin-off-outline" : "pin-outline"}
+              title={(allPinned) ? "Unpin selected" : "Pin selected"}
+              onPress={async () => {
+                await setPinned(etebase!, selection, !allPinned);
+                setSelection(new Set());
+              }}
+            />
+            <AppbarButton icon="delete" title="Delete selected" onPress={() => setDeleteShown(true)} />
+          </View>
         ),
       });
       return;
@@ -140,7 +156,7 @@ export default function NoteListScreen(props: PropsType) {
         <RightAction />
       ),
     });
-  }, [active, navigation, sidebarShown, selecting, selection.size, theme]);
+  }, [active, navigation, sidebarShown, selecting, selection, allPinned, theme]);
 
   if (syncGate) {
     return syncGate;

@@ -401,6 +401,8 @@ export interface SettingsType {
   ranWizrd: boolean;
   theme: "auto" | "dark" | "light";
   fontSize: number;
+  // Whether the pinned notes are folded away (above the notes)
+  pinnedCollapsed?: boolean;
   // Whether the sidebar with the notebooks and notes is shown on wide screens
   sidebarVisible: boolean;
   // Its width in pixels, which can be changed by dragging its edge

@@ -1,16 +1,17 @@
 import * as React from "react";
 import { DateFormats, formatChanged, useDateFormats } from "../pim/format";
 import { FlatList, StyleSheet, View } from "react-native";
-import { Text } from "react-native-paper";
+import { Text, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import * as Etebase from "etebase";
 
 import { useSyncGate } from "../SyncGate";
 import { useCredentials } from "../credentials";
 import { CachedItem, StoreState } from "../store";
 import { defaultColor } from "../helpers";
-import { untitled } from "../notes";
+import { isPinned, untitled } from "../notes";
+import { setSettings } from "../store/actions";
 
 import NotFound from "../widgets/NotFound";
 import Link from "../widgets/Link";
@@ -172,6 +173,160 @@ const NoteRow = React.memo(function NoteRow(props: NoteRowPropsType) {
   );
 });
 
+interface NoteCardPropsType {
+  item: Entry;
+  itemMgr: Etebase.ItemManager | undefined;
+  color: string;
+  notebookName?: string;
+  // The last one when there's an odd number of them: as wide as two, with the beginning of the note
+  wide: boolean;
+  // It's open (next to the list), or selected
+  current: boolean;
+  selected: boolean;
+  // A link that's followed (rather than handled by onPress), e.g. on phones
+  linkAction?: any;
+  onPress: (e?: any) => boolean;
+  onLongPress?: () => void;
+}
+
+// A pinned note, as a card
+const NoteCard = React.memo(function NoteCard(props: NoteCardPropsType) {
+  const fmt = useDateFormats();
+  const theme = useTheme();
+  const { item, itemMgr, color, notebookName, wide, current, selected } = props;
+  const preview = useNotePreview((wide) ? itemMgr : undefined, item.cache);
+  const mtime = item.meta.mtime;
+  const highlighted = current || selected;
+
+  return (
+    <Link
+      to={`/notebook/${item.colUid}/note/${item.uid}`}
+      action={props.linkAction}
+      onPress={props.onPress}
+      renderChild={(linkProps) => (
+        <TouchableRipple
+          {...linkProps}
+          onLongPress={props.onLongPress}
+          delayLongPress={400}
+          accessibilityLabel={item.meta.name || untitled}
+          accessibilityState={{ selected: highlighted }}
+          aria-selected={highlighted}
+          style={[styles.card, {
+            backgroundColor: (highlighted) ? theme.colors.accentTint : theme.colors.surface,
+            borderColor: (highlighted) ? theme.colors.accentRing : theme.colors.border,
+          }]}
+        >
+          <View style={styles.cardInner}>
+            <View style={styles.cardTop}>
+              <View style={[styles.rowColor, { backgroundColor: color }]} />
+              <Text style={[styles.cardSmall, { flex: 1, color: theme.colors.textMuted }]} numberOfLines={1}>{notebookName}</Text>
+              {(selected) ? (
+                <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.accent} />
+              ) : (
+                <MaterialCommunityIcons name="pin" size={13} color={theme.colors.textMuted} accessibilityLabel="Pinned" />
+              )}
+            </View>
+            <Text style={[styles.cardTitle, (!wide) && styles.cardTitleHalf, { color: theme.colors.text }]} numberOfLines={2}>{item.meta.name || untitled}</Text>
+            {wide && !!preview && (
+              <Text style={[styles.cardPreview, { color: theme.colors.textSecondary }]} numberOfLines={1}>{preview}</Text>
+            )}
+            {!!mtime && <Text style={[styles.cardWhen, { color: theme.colors.textMuted }]}>{shortDate(mtime, fmt)}</Text>}
+          </View>
+        </TouchableRipple>
+      )}
+    />
+  );
+});
+
+// Splits the notes into the pinned ones and the others (each keeps the order it had)
+export function splitPinned<T extends CachedItem>(entries: T[]): [T[], T[]] {
+  return [entries.filter(isPinned), entries.filter((x) => !isPinned(x))];
+}
+
+interface PinnedNotesPropsType {
+  notes: Entry[];
+  // How many other notes there are (the title above them, when there are any)
+  others: number;
+  getItemMgr: (colUid: string) => Etebase.ItemManager | undefined;
+  showNotebook: boolean;
+  isCurrent: (note: string) => boolean;
+  isSelected: (note: string) => boolean;
+  linkAction?: any;
+  onPress: (note: string, e?: any) => boolean;
+  onLongPress?: (note: string) => void;
+}
+
+// The pinned notes above the others, as cards two per row, under a title that folds them away. Then
+// the title of the other notes.
+export function PinnedNotes(props: PinnedNotesPropsType) {
+  const theme = useTheme();
+  const dispatch = useDispatch();
+  const cacheCollections = useSelector((state: StoreState) => state.cache.collections);
+  const collapsed = useSelector((state: StoreState) => !!state.settings.pinnedCollapsed);
+  const { notes } = props;
+  if (notes.length === 0) {
+    return null;
+  }
+  const rows: Entry[][] = [];
+  for (let i = 0 ; i < notes.length ; i += 2) {
+    rows.push(notes.slice(i, i + 2));
+  }
+
+  return (
+    <View style={styles.pinned}>
+      <TouchableRipple
+        accessibilityRole="button"
+        accessibilityLabel={`Pinned, ${notes.length}`}
+        accessibilityState={{ expanded: !collapsed }}
+        aria-expanded={!collapsed}
+        onPress={() => dispatch(setSettings({ pinnedCollapsed: !collapsed }) as any)}
+        style={styles.sectionButton}
+      >
+        <View style={styles.sectionTitleRow}>
+          <MaterialCommunityIcons name={(collapsed) ? "chevron-right" : "chevron-down"} size={15} color={theme.colors.textMuted} />
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]} accessibilityRole="header">Pinned</Text>
+          <Text style={[styles.sectionCount, { color: theme.colors.textMuted }]}>{notes.length}</Text>
+        </View>
+      </TouchableRipple>
+      {!collapsed && (
+        <View testID="pinned-notes" style={styles.cards}>
+          {rows.map((row) => (
+            <View key={row[0].uid} style={styles.cardRow}>
+              {row.map((item) => {
+                const key = `${item.colUid}/${item.uid}`;
+                const collection = cacheCollections.get(item.colUid);
+                return (
+                  // (on the web the card is in a link, so it's in a cell that takes its half of the row)
+                  <View key={item.uid} style={styles.cardCell}>
+                    <NoteCard
+                      item={item}
+                      itemMgr={props.getItemMgr(item.colUid)}
+                      color={collection?.meta.color || defaultColor}
+                      notebookName={(props.showNotebook) ? collection?.meta.name : undefined}
+                      wide={row.length === 1}
+                      current={props.isCurrent(key)}
+                      selected={props.isSelected(key)}
+                      linkAction={props.linkAction}
+                      onPress={(e) => props.onPress(key, e)}
+                      onLongPress={(props.onLongPress) ? () => props.onLongPress!(key) : undefined}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      )}
+      {(props.others > 0) && (
+        <View style={[styles.sectionTitleRow, styles.othersTitle, { borderTopColor: theme.colors.divider }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]} accessibilityRole="header">Other notes</Text>
+          <Text style={[styles.sectionCount, { color: theme.colors.textMuted }]}>{props.others}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 interface PropsType {
   colUid?: string;
   sortBy: "name" | "mtime";
@@ -207,7 +362,8 @@ export default function NoteList(props: PropsType) {
   const colUid = props.colUid || undefined;
   const cacheCollection = (colUid) ? cacheCollections.get(colUid) : undefined;
 
-  const entriesList = React.useMemo(() => {
+  // The pinned notes, above the others
+  const [pinnedList, entriesList] = React.useMemo(() => {
     const filterByUid = colUid;
 
     const ret: Entry[] = [];
@@ -224,7 +380,7 @@ export default function NoteList(props: PropsType) {
         ret.push({ ...item, uid, colUid });
       }
     }
-    return ret.sort(getSortFunction(sortBy));
+    return splitPinned(ret.sort(getSortFunction(sortBy)));
   }, [cacheItems, sortBy, colUid]);
 
   if (syncGate) {
@@ -264,8 +420,22 @@ export default function NoteList(props: PropsType) {
       keyExtractor={(item) => item.uid}
       renderItem={renderEntry}
       maxToRenderPerBatch={10}
-      ListHeaderComponent={props.header}
-      ListEmptyComponent={() => (props.empty && !colUid) ? props.empty : (
+      ListHeaderComponent={(
+        <>
+          {props.header}
+          <PinnedNotes
+            notes={pinnedList}
+            others={entriesList.length}
+            getItemMgr={getItemMgr}
+            showNotebook={!colUid}
+            isCurrent={() => false}
+            isSelected={(note) => !!props.selection?.has(note)}
+            onPress={(note) => props.onPressNote?.(note) ?? false}
+            onLongPress={props.onSelect}
+          />
+        </>
+      )}
+      ListEmptyComponent={() => (pinnedList.length > 0) ? null : (props.empty && !colUid) ? props.empty : (
         <Text style={[styles.empty, { color: theme.colors.textMuted }]}>Notebook is empty</Text>
       )}
     />
@@ -324,5 +494,86 @@ const styles = StyleSheet.create({
   empty: {
     padding: 16,
     fontSize: 15,
+  },
+  pinned: {
+    marginBottom: 4,
+  },
+  sectionButton: {
+    alignSelf: "flex-start",
+    borderRadius: 7,
+    marginBottom: 6,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 30,
+    paddingHorizontal: 6,
+  },
+  sectionTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  sectionCount: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  othersTitle: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 6,
+    height: 38,
+    paddingTop: 4,
+  },
+  cards: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  cardRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  // (the cell is its part of the row, and the card all of it)
+  cardCell: {
+    flex: 1,
+    minWidth: 0,
+  },
+  card: {
+    flexGrow: 1,
+    minHeight: 96,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  cardInner: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 16,
+  },
+  cardSmall: {
+    fontSize: 11,
+  },
+  cardTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  // Two lines high, so that the cards next to each other are as high (on the web they're in links,
+  // which don't stretch them to the height of the row)
+  cardTitleHalf: {
+    minHeight: 36,
+  },
+  cardPreview: {
+    fontSize: 13,
+  },
+  cardWhen: {
+    fontSize: 12,
+    marginTop: "auto",
   },
 });

@@ -14,6 +14,9 @@ export const defaultColor = "#8BC34A";
 export interface NoteMetadata extends Etebase.ItemMetadata {
   name: string;
   mtime: number;
+  // Shown above the other notes. It's in the (encrypted) metadata of the note, so it syncs with it.
+  // An unpinned note has no "pinned" at all (the same as in EteSync Notes).
+  pinned?: boolean;
 }
 
 export function* arrayToChunkIterator<T>(arr: T[], size: number) {

@@ -8,6 +8,7 @@ import { CachedCollection, CachedItem } from "./store/reducers";
 import { setCacheItem, unsetCacheItem, unsetSyncItem } from "./store/actions";
 import { saveItemsLocally } from "./sync/SyncManager";
 import { newNotes } from "./newNotes";
+import { NoteMetadata } from "./helpers";
 
 export const untitled = "Untitled";
 
@@ -96,6 +97,50 @@ export async function deleteNotes(etebase: Etebase.Account, notes: Iterable<stri
       meta.mtime = (new Date()).getTime();
       item.setMeta(meta);
       item.delete(true);
+      items.push(item);
+    }
+    if (items.length > 0) {
+      await saveItemsLocally(etebase, col, itemMgr, items);
+    }
+  }
+}
+
+export function isPinned(item: CachedItem) {
+  return !!(item.meta as Partial<NoteMetadata>).pinned;
+}
+
+// Pins notes (or unpins them), given as "colUid/itemUid". It doesn't change when they were changed,
+// so they keep their place among the notes when they're unpinned. The same as in EteSync Notes, which
+// opens the same notes: "pinned: true" in the meta, and no "pinned" at all when unpinned.
+export async function setPinned(etebase: Etebase.Account, notes: Iterable<string>, pinned: boolean) {
+  const state = store.getState() as any;
+  const colMgr = etebase.getCollectionManager();
+  const byNotebook = new Map<string, string[]>();
+  for (const note of notes) {
+    const [colUid, itemUid] = note.split("/");
+    byNotebook.set(colUid, [...(byNotebook.get(colUid) ?? []), itemUid]);
+  }
+  for (const [colUid, itemUids] of byNotebook) {
+    const cachedCol: CachedCollection | undefined = state.cache.collections.get(colUid);
+    if (!cachedCol) {
+      continue;
+    }
+    const col = colMgr.cacheLoad(cachedCol.cache);
+    const itemMgr = colMgr.getItemManager(col);
+    const items: Etebase.Item[] = [];
+    for (const itemUid of itemUids) {
+      const cachedItem: CachedItem | undefined = state.cache.items.get(colUid)?.get(itemUid);
+      if (!cachedItem || cachedItem.isDeleted || (isPinned(cachedItem) === pinned)) {
+        continue;
+      }
+      const item = itemMgr.cacheLoad(cachedItem.cache);
+      const meta = item.getMeta<{ pinned?: boolean }>();
+      if (pinned) {
+        meta.pinned = true;
+      } else {
+        delete meta.pinned;
+      }
+      item.setMeta(meta);
       items.push(item);
     }
     if (items.length > 0) {

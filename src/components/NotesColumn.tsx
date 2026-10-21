@@ -14,14 +14,14 @@ import { SyncManager } from "../sync/SyncManager";
 import { useCredentials } from "../credentials";
 import { usePendingCount, useSyncGate } from "../SyncGate";
 import { defaultColor } from "../helpers";
-import { deleteNotes, untitled } from "../notes";
+import { deleteNotes, isPinned, setPinned, untitled } from "../notes";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import { useNoteSearch } from "../search";
 import { fonts, useTheme } from "../theme";
 import Link from "../widgets/Link";
 import AppbarButton from "../widgets/AppbarButton";
 import { Result } from "../screens/SearchScreen";
-import { Entry, getSortFunction, shortDate, useNotePreview } from "./NoteList";
+import { Entry, getSortFunction, PinnedNotes, shortDate, splitPinned, useNotePreview } from "./NoteList";
 import { useSearchQuery, useWideNavigation } from "./WideLayout";
 
 interface RowPropsType {
@@ -126,10 +126,16 @@ export default function NotesColumn() {
   const pendingCount = usePendingCount();
   const results = useNoteSearch(query, searching && !syncGate);
   const sync = useAutoSync(currentScreen);
-  // The notes selected with ctrl (or cmd) and a click, to delete them
+  // The notes selected with ctrl (or cmd) and a click, to pin or delete them
   const [selection, setSelection] = React.useState<Set<string>>(() => new Set());
   const [deleteShown, setDeleteShown] = React.useState(false);
   const selecting = selection.size > 0;
+  // Whether all of the selected notes are pinned, so that the button unpins them
+  const allPinned = selecting && [...selection].every((note) => {
+    const [colUid, itemUid] = note.split("/");
+    const item = cacheItems.get(colUid)?.get(itemUid);
+    return !!item && isPinned(item);
+  });
 
   // Ctrl-click adds a note to the selection (or takes it away), starting with the one that is
   // open. A click without it opens the note, and selects none.
@@ -219,6 +225,9 @@ export default function NotesColumn() {
     return ret.sort(getSortFunction(viewSettings.sortBy));
   }, [searching, results, cacheItems, filterBy, viewSettings.sortBy]);
 
+  // (the results of a search aren't split)
+  const [pinned, others] = React.useMemo(() => (searching) ? [[], entries] : splitPinned(entries), [searching, entries]);
+
   const byName = (viewSettings.sortBy === "name");
   const title = (selecting) ? `${selection.size} selected` : (searching) ? "Search" : (filterBy) ? (cacheCollections.get(filterBy)?.meta.name ?? "") : "All notes";
   const subtitle = (selecting) ? "Ctrl-click to select more, Esc to select none" : (searching)
@@ -234,6 +243,14 @@ export default function NotesColumn() {
         </View>
         {selecting && (
           <>
+            <AppbarButton
+              icon={(allPinned) ? "pin-off-outline" : "pin-outline"}
+              title={(allPinned) ? "Unpin selected" : "Pin selected"}
+              onPress={async () => {
+                await setPinned(etebase!, selection, !allPinned);
+                setSelection(new Set());
+              }}
+            />
             <AppbarButton icon="delete" title="Delete selected" onPress={() => setDeleteShown(true)} />
             <AppbarButton icon="close" title="Clear selection" onPress={() => setSelection(new Set())} />
           </>
@@ -278,8 +295,21 @@ export default function NotesColumn() {
         <FlatList
           style={{ flex: 1 }}
           contentContainerStyle={styles.list}
-          data={entries}
+          data={others}
           keyExtractor={(item) => `${item.colUid}/${item.uid}`}
+          ListHeaderComponent={(
+            <PinnedNotes
+              notes={pinned}
+              others={others.length}
+              getItemMgr={getItemMgr}
+              showNotebook
+              isCurrent={(note) => !selecting && (currentNote === note)}
+              isSelected={(note) => selection.has(note)}
+              // (the note is opened next to the columns, like from the rows)
+              linkAction={{ type: "NOOP" }}
+              onPress={press}
+            />
+          )}
           extraData={selection}
           maxToRenderPerBatch={10}
           renderItem={({ item }) => {
@@ -296,7 +326,7 @@ export default function NotesColumn() {
               />
             );
           }}
-          ListEmptyComponent={() => (
+          ListEmptyComponent={() => (pinned.length > 0) ? null : (
             <Text style={[styles.empty, { color: theme.colors.textMuted }]}>
               {(searching) ? `No notes match “${query.trim()}”` : (filterBy) ? "Notebook is empty" : "No notes yet"}
             </Text>

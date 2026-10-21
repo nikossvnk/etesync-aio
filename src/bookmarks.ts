@@ -229,11 +229,12 @@ export function metaOf(data: BookmarkData, created: number, savedFrom?: SavedFro
 }
 
 // Saves a new bookmark (to the device, and uploads it), and returns where it is. It's saved from here,
-// unless it's one that was saved elsewhere before (moved to another list, or deleted and undone).
-export async function createBookmark(etebase: Etebase.Account, data: BookmarkData, colUid?: string, created?: number, savedFrom: SavedFrom | undefined = savedHere) {
+// unless it's one that was saved elsewhere before (moved to another list, or deleted and undone),
+// which also keeps what else its meta had (otherMeta, e.g. from a newer version of the app).
+export async function createBookmark(etebase: Etebase.Account, data: BookmarkData, colUid?: string, created?: number, savedFrom: SavedFrom | undefined = savedHere, otherMeta?: Etebase.ItemMetadata) {
   const col = await getCollection(etebase, colUid);
   const itemMgr = etebase.getCollectionManager().getItemManager(col);
-  const meta = metaOf(data, created ?? (new Date()).getTime(), savedFrom);
+  const meta = { ...otherMeta, ...metaOf(data, created ?? (new Date()).getTime(), savedFrom) };
   const item = await itemMgr.create(meta, meta.url);
   await saveItemsLocally(etebase, col, itemMgr, [item]);
   return { colUid: col.uid, uid: item.uid };
@@ -256,7 +257,8 @@ function loadItem(etebase: Etebase.Account, colUid: string, uid: string) {
 // its collection), so it returns where it is now.
 export async function updateBookmark(etebase: Etebase.Account, bookmark: Bookmark, data: BookmarkData, colUid?: string) {
   if (colUid && (colUid !== bookmark.colUid)) {
-    const ret = await createBookmark(etebase, data, colUid, bookmark.created, bookmark.savedFrom);
+    const ret = await createBookmark(etebase, data, colUid, bookmark.created, bookmark.savedFrom,
+      loadItem(etebase, bookmark.colUid, bookmark.uid)?.item.getMeta());
     await deleteBookmark(etebase, bookmark);
     return ret;
   }
@@ -286,9 +288,11 @@ export async function deleteBookmark(etebase: Etebase.Account, bookmark: Bookmar
   await saveItemsLocally(etebase, col, itemMgr, [item]);
 }
 
-// Undoes deleting a bookmark. A deleted item can't come back, so it's saved again as a new one.
+// Undoes deleting a bookmark. A deleted item can't come back, so it's saved again as a new one (with
+// the deleted one's meta, while the device still has it).
 export async function restoreBookmark(etebase: Etebase.Account, bookmark: Bookmark) {
-  return createBookmark(etebase, bookmark, bookmark.colUid, bookmark.created, bookmark.savedFrom);
+  return createBookmark(etebase, bookmark, bookmark.colUid, bookmark.created, bookmark.savedFrom,
+    loadItem(etebase, bookmark.colUid, bookmark.uid)?.item.getMeta());
 }
 
 // Adds tags to several bookmarks at once (the ones that have them already stay as they are)

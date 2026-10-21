@@ -53,7 +53,9 @@ run(async () => {
   }
   const workItems = colMgr.getItemManager(made["Work links"]);
   const old = Date.UTC(2026, 8, 28, 10, 0);
-  await workItems.batch([await workItems.create({ name: `Spreewald ${n}`, mtime: old, url: "https://en.wikipedia.org/wiki/Spreewald", description: "Day trip", tags: ["travel"], created: old, savedFrom: "android-share" }, "https://en.wikipedia.org/wiki/Spreewald")]);
+  await workItems.batch([await workItems.create({ name: `Spreewald ${n}`, mtime: old, url: "https://en.wikipedia.org/wiki/Spreewald", description: "Day trip", tags: ["travel"], created: old, savedFrom: "android-share",
+    // (meta this app doesn't know, e.g. from a newer version of EteSync Notes, which has to be kept)
+    future: { kept: n } }, "https://en.wikipedia.org/wiki/Spreewald")]);
 
   // A web page with a title, to save a link to
   const pageTitle = `Quick save page ${n}`;
@@ -190,6 +192,28 @@ run(async () => {
   check("which puts both back, with where they were saved from", await waitFor(async () => (await lists(etebase)).flatMap((l) => l.bookmarks).filter((x) => [pageUrl, `https://example.com/manual-${n}`].includes(x.url) &&
     (x.savedFrom === "computer")).length === 2));
   check("the Spreewald bookmark still says it was saved from Android after being tagged", (await lists(etebase)).flatMap((l) => l.bookmarks).some((x) => (x.name === `Spreewald ${n}`) && (x.savedFrom === "android-share")));
+  const spreewald = async () => (await lists(etebase)).flatMap((l) => l.bookmarks.map((x) => ({ ...x, list: l.name }))).filter((x) => x.name === `Spreewald ${n}`);
+  check("and still has the meta this app doesn't know", (await spreewald()).some((x) => x.future?.kept === n), await spreewald());
+
+  // Moving one to another list, and undoing deleting it, makes a new item, which keeps everything
+  // of its meta: also what this app doesn't know
+  const keptAll = async (listName) => {
+    const found = await spreewald();
+    return (found.length === 1) && (found[0].list === listName) && (found[0].future?.kept === n) && (found[0].savedFrom === "android-share") &&
+      (found[0].created === old) && (found[0].description === "Day trip");
+  };
+  await list.getByRole("checkbox", { name: `Select Spreewald ${n}` }).click(); await wait(300);
+  await bar.getByRole("button", { name: "Move to…" }).click(); await wait(500);
+  await p.getByRole("menuitem", { name: "Bookmarks" }).click(); await wait(3000);
+  check("a moved bookmark keeps the meta this app doesn't know, on the server", await waitFor(() => keptAll("Bookmarks")), await spreewald());
+  await list.getByRole("button", { name: `Delete Spreewald ${n}` }).click(); await wait(2500);
+  check("(deleted)", await waitFor(async () => (await spreewald()).length === 0));
+  await p.getByRole("button", { name: "Undo" }).click(); await wait(3000);
+  check("and so does one put back by undo", await waitFor(() => keptAll("Bookmarks")), await spreewald());
+  await list.getByRole("checkbox", { name: `Select Spreewald ${n}` }).click(); await wait(300);
+  await bar.getByRole("button", { name: "Move to…" }).click(); await wait(500);
+  await p.getByRole("menuitem", { name: "Work links" }).click(); await wait(3000);
+  check("(moved back)", await waitFor(() => keptAll("Work links")), await spreewald());
   check("no page was asked for apart from \"Get title\"", pageRequests === 1, pageRequests);
 
   // Importing a browser's bookmark file into a list, from its ⋯ menu

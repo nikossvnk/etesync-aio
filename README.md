@@ -134,7 +134,5 @@ from the server show up, and that the ones made or changed in the app get to the
 - Reminders, linking notes to events and tasks,
   favourite contacts, a board view of the tasks (the designs have them, the data has nothing for them yet).
 - Dragging a repeating event moves all of its times (and only to another time of the same day).
-- Where a bookmark was saved: this app records it ("on a computer", or "imported"), but EteSync Notes
-  on Android doesn't yet, so the ones saved there don't say. It also drops it when one is edited there.
 - Licenses: etesync-notes is GPL-3.0 and etesync-web is AGPL-3.0. Files taken from etesync-web keep
   their AGPL-3.0 notice, and the combination has to follow the AGPL (both texts are in `LICENSES/`).

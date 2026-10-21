@@ -17,6 +17,29 @@ themselves are not changed.
 - **New** are the Bookmarks, Calendar, Tasks and Contacts screens, made with the components and theme of the
   notes, in the sidebar (wide screens) and the drawer (phones).
 
+## Installing it
+
+On Linux, with Python 3 and a browser (Chromium, Chrome, Brave, Edge or Firefox):
+
+```
+curl -fsSL https://raw.githubusercontent.com/nikossvnk/etesync-aio/main/desktop/get.sh | sh
+```
+
+It downloads the latest release (the built app, about 2 MB) from this repository's GitHub
+releases, checks its checksum, and installs it in your home directory, with "EteSync Desktop" in
+the applications menu and on the desktop. It runs on `http://localhost:8092`, only reachable from
+this computer. Then log in with your server's URL (under "Advanced settings"), e.g.
+`https://etebase.example.com`.
+
+- **Updating:** run the same line again.
+- **Without systemd,** or to not have a service started at login: `curl … | SERVICE=no sh`. The
+  shortcut then starts the server when it's opened.
+- **Trying it without installing:** download `etesync-desktop-VERSION.tar.gz` from the releases,
+  unpack it, and run `./etesync-desktop` in it.
+- **Removing it:** `~/.local/share/etesync-aio-web/install.sh --uninstall`
+
+More options (port, browser) and how releases are made are in `desktop/README.md`.
+
 ## What's in it
 
 | | |
@@ -79,17 +102,6 @@ themselves are not changed.
 - **Dependencies:** `npm audit` reports issues in the build tools (Expo's and React Native's command
   line tools, Metro), which run when building and aren't part of the app. Fixing them needs major
   upgrades of Expo.
-
-## Installing it
-
-On Linux, with Python 3 (see `desktop/README.md`, also for running it without installing):
-
-```
-curl -fsSL https://raw.githubusercontent.com/nikossvnk/etesync-aio/main/desktop/get.sh | sh
-```
-
-It installs the latest release, the built app, from this repository's GitHub releases, which the
-release workflow makes for each tag.
 
 ## Running it
 

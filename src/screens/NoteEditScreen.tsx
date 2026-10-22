@@ -152,6 +152,7 @@ export default function NoteEditScreen(props: PropsType) {
           onSave={onSave}
           onDelete={() => setNoteDeleteDialogShow(true)}
           onShare={onShare}
+          onHistory={() => navigation.navigate("ItemHistory", { colUid, itemUid })}
           pinned={!!cacheItem && isPinned(cacheItem)}
           onPin={(pinned) => setPinned(etebase!, [`${colUid}/${itemUid}`], pinned)}
           changed={changed}
@@ -502,11 +503,12 @@ interface RightActionViewProps {
   onSave: () => void;
   onDelete: () => void;
   onShare: () => void;
+  onHistory: () => void;
   pinned: boolean;
   onPin: (pinned: boolean) => void;
 }
 
-function RightAction({ viewMode, setViewMode, onSave, onDelete, onShare, pinned, onPin, changed }: RightActionViewProps) {
+function RightAction({ viewMode, setViewMode, onSave, onDelete, onShare, onHistory, pinned, onPin, changed }: RightActionViewProps) {
 
   return (
     <View style={{ flexDirection: "row" }}>
@@ -516,6 +518,7 @@ function RightAction({ viewMode, setViewMode, onSave, onDelete, onShare, pinned,
       {(canShare()) ? (
         <AppbarButton icon="share-variant" title="Share" onPress={onShare} />
       ) : null}
+      <AppbarButton icon="history" title="History" onPress={onHistory} />
       <AppbarButton icon="delete" title="Delete" onPress={onDelete} />
     </View>
   );

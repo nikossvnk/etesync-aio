@@ -27,6 +27,7 @@ import AccountWizardScreen from "./screens/AccountWizardScreen";
 import NotFoundScreen from "./screens/NotFoundScreen";
 import CalendarScreen from "./pim/CalendarScreen";
 import EventEditScreen from "./pim/EventEditScreen";
+import ItemHistoryScreen from "./screens/ItemHistoryScreen";
 import TasksScreen from "./pim/TasksScreen";
 import TaskEditScreen from "./pim/TaskEditScreen";
 import ContactsScreen, { ContactScreen } from "./pim/ContactsScreen";
@@ -219,6 +220,11 @@ export default React.memo(function RootNavigator() {
                   <Stack.Screen
                     name="EventEdit"
                     component={EventEditScreen}
+                  />
+                  <Stack.Screen
+                    name="ItemHistory"
+                    component={ItemHistoryScreen}
+                    options={{ title: "History" }}
                   />
                   <Stack.Screen
                     name="Tasks"

@@ -168,7 +168,7 @@ export function SmallButton(props: { label: string, onPress: () => void, icon?: 
 }
 
 // The details of the event chosen in the week view
-export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: (x: Occurrence) => void, onOpenContact: (x: Occurrence) => void }) {
+export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: (x: Occurrence) => void, onOpenContact: (x: Occurrence) => void, onHistory?: (x: Occurrence) => void }) {
   const theme = useTheme();
   const { x, fmt } = props;
   if (!x) {
@@ -197,7 +197,10 @@ export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: 
       {!!description && <Text style={{ fontSize: 13, color: theme.colors.textBody }}>{description}</Text>}
       <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
         {(x.event) ? (
-          <SmallButton label="Edit" icon="pencil-outline" onPress={() => props.onEdit(x)} />
+          <>
+            <SmallButton label="Edit" icon="pencil-outline" onPress={() => props.onEdit(x)} />
+            {props.onHistory && <SmallButton label="History" icon="history" onPress={() => props.onHistory!(x)} />}
+          </>
         ) : (
           <SmallButton label="Open contact" icon="account-outline" onPress={() => props.onOpenContact(x)} />
         )}

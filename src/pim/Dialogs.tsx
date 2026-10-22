@@ -62,7 +62,7 @@ function host(etebase: Etebase.Account | null | undefined) {
 }
 
 // A dialog: its title (and steps), what's in it, and a bar with what it does at the bottom
-function Frame(props: React.PropsWithChildren<{ title: string, steps?: { labels: string[], current: number }, onClose: () => void, footer: React.ReactNode, width: number, testID?: string }>) {
+export function Frame(props: React.PropsWithChildren<{ title: string, steps?: { labels: string[], current: number }, onClose: () => void, footer: React.ReactNode, width: number, testID?: string }>) {
   const theme = useTheme();
   const etebase = useCredentials();
   const window = useWindowDimensions();

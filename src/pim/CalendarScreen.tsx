@@ -331,7 +331,8 @@ export default function CalendarScreen() {
         <View style={{ flex: 1, flexDirection: (wide) ? "row" : "column" }}>
           <View style={{ flex: 1, minHeight: (wide) ? undefined : 480, paddingTop: 4 }}>{grid}</View>
           {wide && (view === "week") && side(
-            <EventDetails x={selectedOccurrence} fmt={fmt} onEdit={open} onOpenContact={open} />,
+            <EventDetails x={selectedOccurrence} fmt={fmt} onEdit={open} onOpenContact={open}
+              onHistory={(x) => navigation.navigate("ItemHistory", { colUid: x.event!.collectionUid, itemUid: x.event!.itemUid })} />,
             "event-panel"
           )}
           {moveDialog}

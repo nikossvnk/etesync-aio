@@ -29,6 +29,7 @@ export type RootStackParamList = {
     itemUid: string;
   };
   Calendar: undefined;
+  ItemHistory: { colUid: string, itemUid: string };
   EventEdit: { colUid?: string, itemUid?: string, occurrence?: string, date?: string, time?: string, title?: string, attendeeName?: string, attendeeEmail?: string } | undefined;
   Tasks: undefined;
   TaskEdit: { colUid?: string, itemUid?: string } | undefined;
@@ -49,7 +50,7 @@ export type RootStackParamList = {
 };
 
 // The screens of the calendar, the tasks, the contacts and the bookmarks (and their parts)
-export const pimScreens: string[] = ["Calendar", "EventEdit", "Tasks", "TaskEdit", "Contacts", "Contact", "ContactEdit", "Bookmarks", "SearchAll"];
+export const pimScreens: string[] = ["ItemHistory", "Calendar", "EventEdit", "Tasks", "TaskEdit", "Contacts", "Contact", "ContactEdit", "Bookmarks", "SearchAll"];
 
 // The settings (and their parts) and the account's screens, which aren't about notes either
 export const accountScreens: string[] = ["Settings", "About", "Password", "DebugLogs", "Invitations", "Collections", "CollectionChangelog"];

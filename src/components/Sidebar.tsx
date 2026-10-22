@@ -216,7 +216,7 @@ export function sectionOf(screen: string | undefined): Section {
     return "contacts";
   } else if (["Settings", "About", "Password", "DebugLogs", "Invitations", "Collections", "CollectionChangelog"].includes(screen)) {
     return "settings";
-  } else if (["SearchAll"].includes(screen)) {
+  } else if (["SearchAll", "ItemHistory"].includes(screen)) {
     return "other";
   }
   return "notes";

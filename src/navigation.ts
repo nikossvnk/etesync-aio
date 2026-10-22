@@ -33,6 +33,8 @@ const upTargets: { [name in RouteName]?: UpTarget } = {
   CollectionMembers: { names: ["CollectionChangelog"], params: notebook },
   Invitations: { names: lists },
   EventEdit: { names: ["Calendar"] },
+  // (back to where it was opened from: the note, the event, or the calendar)
+  ItemHistory: { names: ["Home", "NoteEdit", "EventEdit", "Calendar", "Collection"] },
   TaskEdit: { names: ["Tasks"] },
   Contact: { names: ["Contacts"] },
   ContactEdit: { names: ["Contact", "Contacts"] },

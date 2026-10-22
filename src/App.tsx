@@ -54,6 +54,7 @@ const rootStackScreens: RootStackScreens = {
   NoteMove: "notebook/:colUid/note/:itemUid/move",
   Calendar: "calendar",
   EventEdit: "calendar/event",
+  ItemHistory: "history/:colUid/:itemUid",
   Tasks: "tasks",
   TaskEdit: "tasks/task",
   Contacts: "contacts",

@@ -19,7 +19,6 @@ import HomeScreen, { NotebooksRoute, SearchRoute } from "./screens/HomeScreen";
 import NoteEditScreen from "./screens/NoteEditScreen";
 import NoteCreateScreen from "./screens/NoteCreateScreen";
 import NoteRedirectScreen from "./screens/NoteRedirectScreen";
-import CollectionEditScreen from "./screens/CollectionEditScreen";
 import CollectionChangelogScreen from "./screens/CollectionChangelogScreen";
 import CollectionMembersScreen from "./screens/CollectionMembersScreen";
 import InvitationsScreen from "./screens/InvitationsScreen";
@@ -32,7 +31,7 @@ import TasksScreen from "./pim/TasksScreen";
 import TaskEditScreen from "./pim/TaskEditScreen";
 import ContactsScreen, { ContactScreen } from "./pim/ContactsScreen";
 import ContactEditScreen from "./pim/ContactEditScreen";
-import SyncAction from "./pim/SyncAction";
+import { AutoSyncButton } from "./components/SyncButton";
 import SearchAllScreen from "./pim/SearchAllScreen";
 import CollectionsScreen from "./pim/CollectionsScreen";
 import BookmarksScreen from "./pim/BookmarksScreen";
@@ -181,14 +180,6 @@ export default React.memo(function RootNavigator() {
                     component={NoteRedirectScreen}
                   />
                   <Stack.Screen
-                    name="CollectionEdit"
-                    component={CollectionEditScreen}
-                  />
-                  <Stack.Screen
-                    name="CollectionCreate"
-                    component={CollectionEditScreen}
-                  />
-                  <Stack.Screen
                     name="CollectionChangelog"
                     component={CollectionChangelogScreen}
                     options={{
@@ -211,7 +202,7 @@ export default React.memo(function RootNavigator() {
                     component={CalendarScreen}
                     options={{
                       title: "Calendar",
-                      headerRight: () => <SyncAction screen="Calendar" />,
+                      headerRight: () => <AutoSyncButton />,
                       headerLeft: () => (
                         <MenuButton />
                       ),
@@ -231,7 +222,7 @@ export default React.memo(function RootNavigator() {
                     component={TasksScreen}
                     options={{
                       title: "Tasks",
-                      headerRight: () => <SyncAction screen="Tasks" />,
+                      headerRight: () => <AutoSyncButton />,
                       headerLeft: () => (
                         <MenuButton />
                       ),
@@ -246,7 +237,7 @@ export default React.memo(function RootNavigator() {
                     component={ContactsScreen}
                     options={{
                       title: "Contacts",
-                      headerRight: () => <SyncAction screen="Contacts" />,
+                      headerRight: () => <AutoSyncButton />,
                       headerLeft: () => (
                         <MenuButton />
                       ),
@@ -265,7 +256,7 @@ export default React.memo(function RootNavigator() {
                     component={BookmarksScreen}
                     options={{
                       title: "Bookmarks",
-                      headerRight: () => <SyncAction screen="Bookmarks" />,
+                      headerRight: () => <AutoSyncButton />,
                       headerLeft: () => (
                         <MenuButton />
                       ),
@@ -362,7 +353,7 @@ function GlobalMessages() {
       action={{
         label: "Dismiss",
         onPress: handleClose,
-        textColor: (theme.dark) ? theme.colors.accent : "#A8BDF7",
+        textColor: theme.colors.onChipActiveAccent,
       }}
     >
       <Text style={{ color: theme.colors.onChipActive }}>{message?.message}</Text>

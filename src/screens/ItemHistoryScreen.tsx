@@ -35,10 +35,6 @@ interface PropsType {
   route: RouteProp<RootStackParamList, "ItemHistory">;
 }
 
-const green = "#5CC59B";
-const red = "#F29B9B";
-const yellow = "#F2C94C";
-
 // When a version was saved, short ("Today, 09:14", "20 Oct, 14:02") and long ("Tuesday 20 October, 14:02")
 function when(mtime: number | undefined, fmt: DateFormats) {
   if (!mtime) {
@@ -202,8 +198,8 @@ export default function ItemHistoryScreen(props: PropsType) {
         {head}
         <View style={styles.problemWrap}>
           <View role="alert" style={[styles.problem, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]} testID="history-problem">
-            <View style={[styles.problemIcon, { backgroundColor: (problem.offline) ? theme.colors.field : tint(red, 0.14) }]}>
-              <MaterialCommunityIcons name={(problem.offline) ? "cloud-off-outline" : "alert-circle-outline"} size={22} color={(problem.offline) ? theme.colors.textSecondary : red} />
+            <View style={[styles.problemIcon, { backgroundColor: (problem.offline) ? theme.colors.field : tint(theme.colors.negative, 0.14) }]}>
+              <MaterialCommunityIcons name={(problem.offline) ? "cloud-off-outline" : "alert-circle-outline"} size={22} color={(problem.offline) ? theme.colors.textSecondary : theme.colors.negative} />
             </View>
             <Text style={[styles.problemTitle, { color: theme.colors.text }]}>{(problem.offline) ? "History needs a connection" : "Couldn’t load the history"}</Text>
             <Text style={{ color: theme.colors.textBody, textAlign: "center" }}>
@@ -245,7 +241,7 @@ export default function ItemHistoryScreen(props: PropsType) {
       <ScrollView contentContainerStyle={{ gap: 2 }}>
         {versions.map((x, i) => {
           const on = wide && (i === chosen);
-          const pill = (i === 0) ? [theme.colors.accentTint, theme.colors.accentText] : (x.deleted) ? [tint(red, 0.16), red] : ["transparent", theme.colors.textMuted];
+          const pill = (i === 0) ? [theme.colors.accentTint, theme.colors.accentText] : (x.deleted) ? [tint(theme.colors.negative, 0.16), theme.colors.negative] : ["transparent", theme.colors.textMuted];
           return (
             <TouchableRipple
               key={x.id}
@@ -256,7 +252,7 @@ export default function ItemHistoryScreen(props: PropsType) {
               style={[styles.row, (on) && { backgroundColor: theme.colors.field, borderColor: tint(theme.colors.accent, 0.45) }]}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View style={[styles.dot, { backgroundColor: (i === 0) ? theme.colors.accent : (x.deleted) ? red : theme.colors.disabled }]} />
+                <View style={[styles.dot, { backgroundColor: (i === 0) ? theme.colors.accent : (x.deleted) ? theme.colors.negative : theme.colors.disabled }]} />
                 <Text style={{ flex: 1, color: theme.colors.text, fontFamily: fonts.medium }}>{when(x.mtime, fmt).short}</Text>
                 <Text style={[styles.pill, { backgroundColor: pill[0], color: pill[1] }]}>{label(i)}</Text>
               </View>
@@ -280,7 +276,7 @@ export default function ItemHistoryScreen(props: PropsType) {
       )}
       <View style={styles.versionHead}>
         <View style={{ flex: 1, minWidth: 200 }}>
-          <Text style={{ fontSize: 12, fontFamily: fonts.semibold, color: (chosen === 0) ? theme.colors.accentText : (version.deleted) ? red : theme.colors.textMuted }}>{label(chosen)}</Text>
+          <Text style={{ fontSize: 12, fontFamily: fonts.semibold, color: (chosen === 0) ? theme.colors.accentText : (version.deleted) ? theme.colors.negative : theme.colors.textMuted }}>{label(chosen)}</Text>
           <Text style={{ fontSize: 17, fontFamily: fonts.semibold, color: theme.colors.text }}>{when(version.mtime, fmt).long}</Text>
         </View>
         {(chosen === 0) ? (
@@ -355,11 +351,11 @@ function VersionBody(props: { version: Version, older?: Version, isNote: boolean
     const lines = (compared) ? diffLines(older!.content, version.content) : version.content.split("\n").map((text) => ({ text, change: "same" as const }));
     counts = { added: lines.filter((x) => x.change === "added").length, removed: lines.filter((x) => x.change === "removed").length, changed: (titleChanged) ? 1 : 0 };
     rows = [
-      <View key="title" style={[styles.line, (titleChanged) && { backgroundColor: tint(yellow, 0.12) }]}>
-        <Text style={[styles.mark, { color: yellow }]} aria-hidden>{(titleChanged) ? "±" : ""}</Text>
+      <View key="title" style={[styles.line, (titleChanged) && { backgroundColor: tint(theme.colors.changed, 0.12) }]}>
+        <Text style={[styles.mark, { color: theme.colors.changed }]} aria-hidden>{(titleChanged) ? "±" : ""}</Text>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 24, fontFamily: fonts.bold, color: theme.colors.text }}>{(titleChanged) ? "Changed: " : ""}{version.name || "Untitled"}</Text>
-          {titleChanged && <Text style={muted}>was <Text style={{ textDecorationLine: "line-through", color: red }}>{older!.name || "Untitled"}</Text></Text>}
+          {titleChanged && <Text style={muted}>was <Text style={{ textDecorationLine: "line-through", color: theme.colors.negative }}>{older!.name || "Untitled"}</Text></Text>}
         </View>
       </View>,
       ...lines.map((x, i) => <NoteLine key={i} text={x.text} change={x.change} />),
@@ -379,9 +375,9 @@ function VersionBody(props: { version: Version, older?: Version, isNote: boolean
         if (change !== "same") {
           counts[change]++;
         }
-        const pill = { added: ["Added", green], removed: ["Removed", red], changed: ["Changed", yellow], same: ["", ""] }[change];
+        const pill = { added: ["Added", theme.colors.positive], removed: ["Removed", theme.colors.negative], changed: ["Changed", theme.colors.changed], same: ["", ""] }[change];
         return (
-          <View key={labelText} style={[styles.field, { borderBottomColor: theme.colors.divider }, (change === "added") && { backgroundColor: tint(green, 0.07) }, (change === "removed") && { backgroundColor: tint(red, 0.06) }]}>
+          <View key={labelText} style={[styles.field, { borderBottomColor: theme.colors.divider }, (change === "added") && { backgroundColor: tint(theme.colors.positive, 0.07) }, (change === "removed") && { backgroundColor: tint(theme.colors.negative, 0.06) }]}>
             <View style={styles.fieldLabel}>
               <Text style={[{ fontSize: 13 }, muted]}>{labelText}</Text>
               {!!pill[0] && <Text style={[styles.pill, { backgroundColor: tint(pill[1], 0.16), color: pill[1] }]}>{pill[0]}</Text>}
@@ -391,18 +387,18 @@ function VersionBody(props: { version: Version, older?: Version, isNote: boolean
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   {(now?.list ?? []).map((x) => {
                     const added = !!before && !(then?.list ?? []).includes(x);
-                    return <Text key={x} style={[styles.chip, { backgroundColor: (added) ? tint(green, 0.22) : theme.colors.field, color: theme.colors.text }]}>{(added) ? "+ " : ""}{x}</Text>;
+                    return <Text key={x} style={[styles.chip, { backgroundColor: (added) ? tint(theme.colors.positive, 0.22) : theme.colors.field, color: theme.colors.text }]}>{(added) ? "+ " : ""}{x}</Text>;
                   })}
                   {(!!before) && (then?.list ?? []).filter((x) => !(now?.list ?? []).includes(x)).map((x) => (
-                    <Text key={"-" + x} style={[styles.chip, { backgroundColor: tint(red, 0.18), color: red, textDecorationLine: "line-through" }]}>− {x}</Text>
+                    <Text key={"-" + x} style={[styles.chip, { backgroundColor: tint(theme.colors.negative, 0.18), color: theme.colors.negative, textDecorationLine: "line-through" }]}>− {x}</Text>
                   ))}
                 </View>
               ) : (change === "removed") ? (
-                <Text style={{ color: red, textDecorationLine: "line-through" }}>{text(then)}</Text>
+                <Text style={{ color: theme.colors.negative, textDecorationLine: "line-through" }}>{text(then)}</Text>
               ) : (
                 <>
-                  <Text style={[{ color: theme.colors.text, alignSelf: "flex-start" }, (change !== "same") && { backgroundColor: tint(green, 0.22), paddingHorizontal: 4 }]}>{text(now)}</Text>
-                  {(change === "changed") && <Text style={muted}>was <Text style={{ textDecorationLine: "line-through", color: red }}>{text(then)}</Text></Text>}
+                  <Text style={[{ color: theme.colors.text, alignSelf: "flex-start" }, (change !== "same") && { backgroundColor: tint(theme.colors.positive, 0.22), paddingHorizontal: 4 }]}>{text(now)}</Text>
+                  {(change === "changed") && <Text style={muted}>was <Text style={{ textDecorationLine: "line-through", color: theme.colors.negative }}>{text(then)}</Text></Text>}
                 </>
               )}
             </View>
@@ -416,9 +412,9 @@ function VersionBody(props: { version: Version, older?: Version, isNote: boolean
     <View style={{ gap: 12 }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }} testID="history-compare">
         <Text style={muted}>{(compared) ? `Changes since the version from ${when(older!.mtime, fmt).short}.` : "First version — there is nothing earlier to compare with."}</Text>
-        {compared && (counts.added > 0) && <Text style={[styles.pill, { backgroundColor: tint(green, 0.16), color: green }]}>+ {counts.added} added</Text>}
-        {compared && (counts.removed > 0) && <Text style={[styles.pill, { backgroundColor: tint(red, 0.16), color: red }]}>− {counts.removed} removed</Text>}
-        {compared && (counts.changed > 0) && <Text style={[styles.pill, { backgroundColor: tint(yellow, 0.16), color: yellow }]}>± {counts.changed} changed</Text>}
+        {compared && (counts.added > 0) && <Text style={[styles.pill, { backgroundColor: tint(theme.colors.positive, 0.16), color: theme.colors.positive }]}>+ {counts.added} added</Text>}
+        {compared && (counts.removed > 0) && <Text style={[styles.pill, { backgroundColor: tint(theme.colors.negative, 0.16), color: theme.colors.negative }]}>− {counts.removed} removed</Text>}
+        {compared && (counts.changed > 0) && <Text style={[styles.pill, { backgroundColor: tint(theme.colors.changed, 0.16), color: theme.colors.changed }]}>± {counts.changed} changed</Text>}
       </View>
       <View style={[styles.body, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         {rows}
@@ -451,11 +447,11 @@ function NoteLine(props: { text: string, change: "same" | "added" | "removed" })
   if (!text.trim() && (change === "same")) {
     return <View style={{ height: 6 }} />;
   }
-  const color = (change === "added") ? green : (change === "removed") ? red : undefined;
+  const color = (change === "added") ? theme.colors.positive : (change === "removed") ? theme.colors.negative : undefined;
   return (
     <View style={[styles.line, (color) && { backgroundColor: tint(color, (change === "added") ? 0.14 : 0.12) }]}>
       <Text style={[styles.mark, { color }]} aria-hidden>{(change === "added") ? "+" : (change === "removed") ? "−" : ""}</Text>
-      <Text style={[{ flex: 1 }, style, (change === "removed") && { color: red, textDecorationLine: "line-through" }]}>
+      <Text style={[{ flex: 1 }, style, (change === "removed") && { color: theme.colors.negative, textDecorationLine: "line-through" }]}>
         {(change === "added") ? <Text style={styles.hidden}>Added: </Text> : (change === "removed") ? <Text style={styles.hidden}>Removed: </Text> : null}
         {prefix}{text || " "}
       </Text>

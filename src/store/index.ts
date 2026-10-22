@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2019 EteSync Authors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { createStore, applyMiddleware } from "redux";
+import { createStore, applyMiddleware, Store } from "redux";
 import { persistStore } from "redux-persist";
 import { thunk as thunkMiddleware } from "redux-thunk";
 import { createLogger } from "redux-logger";
@@ -10,7 +10,7 @@ import { ActionMeta } from "redux-actions";
 
 import promiseMiddleware from "./promise-middleware";
 
-import reducers from "./construct";
+import reducers, { StoreState } from "./construct";
 
 // Workaround babel limitation
 export * from "./reducers";
@@ -75,7 +75,8 @@ export function useAsyncDispatch() {
   } as typeof asyncDispatch;
 }
 
-export const store = createStore(
+// (the reducers are typed loosely, so the state's type is given here)
+export const store: Store<StoreState, any> = createStore(
   reducers as any,
   applyMiddleware(...(middleware as any[]))
 );

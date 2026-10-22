@@ -9,20 +9,20 @@ import { useDispatch, useSelector } from "react-redux";
 import * as Etebase from "etebase";
 
 import { StoreState } from "../store";
-import { performSync, setSettings } from "../store/actions";
-import { SyncManager } from "../sync/SyncManager";
+import { setSettings } from "../store/actions";
 import { useCredentials } from "../credentials";
-import { usePendingCount, useSyncGate } from "../SyncGate";
-import { defaultColor } from "../helpers";
-import { deleteNotes, isPinned, setPinned, untitled } from "../notes";
+import { useSyncGate } from "../SyncGate";
+import { deleteNotes, isPinned, untitled } from "../notes";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import { useNoteSearch } from "../search";
 import { fonts, useTheme } from "../theme";
 import Link from "../widgets/Link";
 import AppbarButton from "../widgets/AppbarButton";
+import SyncButton, { syncPausedOn, useAutoSync } from "./SyncButton";
 import { Result } from "../screens/SearchScreen";
-import { Entry, getSortFunction, PinnedNotes, shortDate, splitPinned, useNotePreview } from "./NoteList";
+import { Entry, getSortFunction, PinnedNotes, SelectionButtons, shortDate, splitPinned, useItemManagers, useNotePreview } from "./NoteList";
 import { useSearchQuery, useWideNavigation } from "./WideLayout";
+import { defaultColor } from "../constants";
 
 interface RowPropsType {
   item: Entry;
@@ -77,38 +77,6 @@ const NoteRow = React.memo(function NoteRow(props: RowPropsType) {
   );
 });
 
-// Syncs when the column is shown, and every few minutes on the web. Not while the screen after
-// logging in is open, which syncs for itself first (and would think there are no notebooks yet).
-export function useAutoSync(currentScreen: string | undefined) {
-  const etebase = useCredentials();
-  const dispatch = useDispatch();
-  const paused = !currentScreen || ["AccountWizard", "Login", "Signup"].includes(currentScreen);
-
-  const sync = React.useCallback(() => {
-    if (etebase) {
-      dispatch(performSync(SyncManager.getManager(etebase).sync()) as any); // not awaiting on purpose
-    }
-  }, [etebase]);
-
-  React.useEffect(() => {
-    if (paused) {
-      return undefined;
-    }
-    sync();
-    if (Platform.OS !== "web") {
-      return undefined;
-    }
-    const id = setInterval(() => {
-      if (navigator.onLine) {
-        sync();
-      }
-    }, 5 * 60 * 1000);
-    return () => clearInterval(id);
-  }, [sync, paused]);
-
-  return sync;
-}
-
 // The second column on wide screens: the notes of the chosen notebook (or all of them), or what
 // was searched for
 export default function NotesColumn() {
@@ -123,9 +91,9 @@ export default function NotesColumn() {
   const cacheItems = useSelector((state: StoreState) => state.cache.items);
   const viewSettings = useSelector((state: StoreState) => state.settings.viewSettings);
   const isSyncing = useSelector((state: StoreState) => state.syncCount) > 0;
-  const pendingCount = usePendingCount();
   const results = useNoteSearch(query, searching && !syncGate);
-  const sync = useAutoSync(currentScreen);
+  // (it syncs when the column is shown)
+  const sync = useAutoSync(syncPausedOn(currentScreen));
   // The notes selected with ctrl (or cmd) and a click, to pin or delete them
   const [selection, setSelection] = React.useState<Set<string>>(() => new Set());
   const [deleteShown, setDeleteShown] = React.useState(false);
@@ -184,16 +152,7 @@ export default function NotesColumn() {
     }
   }
 
-  // The item managers the rows load their previews with, created as needed
-  const itemMgrs = React.useMemo(() => new Map<string, Etebase.ItemManager>(), [etebase, cacheCollections]);
-  function getItemMgr(colUid: string) {
-    const cached = cacheCollections.get(colUid);
-    if (!itemMgrs.has(colUid) && etebase && cached) {
-      const colMgr = etebase.getCollectionManager();
-      itemMgrs.set(colUid, colMgr.getItemManager(colMgr.cacheLoad(cached.cache)));
-    }
-    return itemMgrs.get(colUid);
-  }
+  const getItemMgr = useItemManagers();
 
   const entries: (Entry & { snippet?: React.ReactNode })[] = React.useMemo(() => {
     if (searching) {
@@ -243,15 +202,7 @@ export default function NotesColumn() {
         </View>
         {selecting && (
           <>
-            <AppbarButton
-              icon={(allPinned) ? "pin-off-outline" : "pin-outline"}
-              title={(allPinned) ? "Unpin selected" : "Pin selected"}
-              onPress={async () => {
-                await setPinned(etebase!, selection, !allPinned);
-                setSelection(new Set());
-              }}
-            />
-            <AppbarButton icon="delete" title="Delete selected" onPress={() => setDeleteShown(true)} />
+            <SelectionButtons selection={selection} allPinned={allPinned} onPinned={() => setSelection(new Set())} onDelete={() => setDeleteShown(true)} />
             <AppbarButton icon="close" title="Clear selection" onPress={() => setSelection(new Set())} />
           </>
         )}
@@ -260,12 +211,7 @@ export default function NotesColumn() {
           title="New note"
           onPress={() => navigate("NoteCreate", (filterBy) ? { colUid: filterBy } : undefined)}
         />}
-        {!selecting && <AppbarButton
-          icon={(pendingCount > 0) ? "cloud-upload-outline" : "sync"}
-          title={(pendingCount > 0) ? `Sync (${pendingCount} not uploaded yet)` : "Sync"}
-          disabled={isSyncing}
-          onPress={sync}
-        />}
+        {!selecting && <SyncButton onPress={sync} />}
         {(!searching && !selecting) && (
           <AppbarButton
             icon={(byName) ? "sort-alphabetical-ascending" : "sort-clock-descending-outline"}

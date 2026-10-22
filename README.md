@@ -51,7 +51,7 @@ More options (port, browser) and how releases are made are in `desktop/README.md
 | Tasks | Adding from the top, the tasks in Overdue, Today, Upcoming and No date, today's progress. Each shows its list, its subtasks, a flag when it's important, and when it's due. Next to them on wide screens the chosen task's details: due, repeat, list, priority, its subtasks to tick off and add, and its notes. Repeating tasks get their next time when done. An editor for all of it. |
 | Contacts | A to Z, by address book or group. A contact's details, with buttons to email, call, schedule an event with them (they're invited) and edit, and what's about them: the events with them (and their birthday), the notes and the open tasks that mention them. |
 | History | The earlier versions of a note or an event, which the server keeps (opened with History in the bar of the note, the event's editor, or the event's details in the week). Newest first; the chosen one shows what changed since the one before it (the lines of a note that were added or removed, the fields of an event that changed and what they were). An earlier version can be restored, which saves it as a new version. It needs a connection, as the versions are only on the server. |
-| Collections | Like the web app's Collections and Import pages. The + of each section of the sidebar makes a calendar, task list, address book, notebook or bookmark list (name, description, colour); the ⋯ of each has its colour, editing, sharing, showing only it, exporting (.ics, .vcf, .md, and .html for bookmarks, which browsers can import), importing into it and deleting. Settings → Collections lists them all, with how much is in them, who they're shared with and when they changed, and edits the chosen one: its details, who has access (invitations by username, after checking their security fingerprint; changing and removing access), its changes, and deleting it (or leaving one shared with you). Importing: .ics (events and tasks), .vcf (contacts), .md or .txt files (a note each) and .html bookmark files exported from Chrome, Firefox and other browsers (the folders the bookmarks were in become their tags) are read on the device; what's in them can go to existing or new collections, what's there already (by its UID, or the link for bookmarks) is skipped, updated or copied, and what can't be read is reported with its line. The wizard makes the missing collections for new accounts. |
+| Collections | Like the web app's Collections and Import pages. The + of each section of the sidebar makes a calendar, task list, address book, notebook or bookmark list (name, description, colour); the ⋯ of each has its colour, editing, sharing, showing only it, exporting (.ics, .vcf, .md, and .html for bookmarks, which browsers can import), importing into it and deleting. Settings → Collections lists them all, with how much is in them, who they're shared with and when they changed, and edits the chosen one: its details, who has access (invitations by username, after checking their security fingerprint; changing and removing access), its changes, and deleting it (or leaving one shared with you). Importing: .ics (events and tasks), .vcf (contacts), .md or .txt files (a note each) and .html bookmark files exported from Chrome, Firefox and other browsers (the folders the bookmarks were in become their tags) are read on the device; what's in them can go to existing or new collections, what's there already (by its UID, or the link for bookmarks) is skipped, updated or copied, and what can't be read is reported with its line. The wizard makes the missing collections for new accounts. On phones too, notebooks are made with the same dialog (from the notebooks, or a new note when there's no notebook yet) and edited in Settings → Collections (from a notebook's Manage → Edit). |
 | Login, signup, account | Do what the web app's do (the same Etebase calls and checks). On wide screens a card under a bar with the help links and the settings, on phones the menu. The server is shown, and changed only when asked to. Signing up shows how strong the password is, and needs agreeing that it can't be recovered. |
 | Settings | One screen: the notes' settings, and "Calendar and Tasks" with the settings of the web app. The web app's dark mode setting is the notes' theme setting. |
 
@@ -114,6 +114,15 @@ npx expo export -p web --output-dir web-build  # a build, e.g. served by e2e/ser
 
 ## Tests
 
+`npm test` runs the unit tests in `test/` (with Node.js 22 or newer, nothing else to install or
+start). They check the app's own logic, without a browser or a server: the times of repeating
+events (`occurrences.test.js`), that the screens share one list of the parsed events, tasks and
+contacts, made again only when they changed (`data.test.js`), and that saving many items is one
+change of the store, which doesn't make the notes draw again when it isn't about notes
+(`store.test.js`). `test/register.js` compiles the app's TypeScript for them and replaces the
+modules that need React Native or a device.
+
+The browser tests are in `e2e/` (see `e2e/README.md`).
 `e2e/tests/pinned-notes.js` checks pinning notes on phones and wide screens (on the server: the pin,
 that the modification time stays, unpinning, another device, pinning offline while the note is
 changed elsewhere), the cards, and folding them away.
@@ -125,6 +134,9 @@ from the server show up, and that the ones made or changed in the app get to the
 `e2e/tests/recurring.js` does the same for repeating events: their changed and cancelled times, and
 changing, moving and deleting one time or all of them. `e2e/tests/history.js` checks the history
 of notes and events, and that restoring a version puts it back on the server.
+`e2e/tests/many-items.js` imports 500 contacts at once (they all reach the server, quickly) and
+shows an event that repeats every day since 2015 in the week, `e2e/tests/notebook-color.js` checks
+making and editing notebooks on phones (with the same dialog and page as the other collections), and `e2e/tests/return-sync.js` that coming back to the app syncs.
 
 ## Not done (it's a proof of concept)
 

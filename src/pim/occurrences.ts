@@ -12,7 +12,8 @@ import { useCredentials } from "../credentials";
 import { StoreState } from "../store";
 import * as C from "../constants";
 import { ContactType, EventType } from "./pim-types";
-import { defaultColor, PimCollection, usePimCollections, usePimItems } from "./data";
+import { changedTimeAt } from "./recurrence";
+import { PimCollection, usePimCollections, usePimItems } from "./data";
 
 // The calendar the birthdays of contacts are in, which can be hidden like the others
 export const birthdaysUid = "birthdays";
@@ -137,7 +138,7 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
           start: s,
           end: e,
           allDay,
-          color: calendar?.color ?? defaultColor,
+          color: calendar?.color ?? C.defaultColor,
           colUid: event.collectionUid!,
           calendarName: calendar?.name ?? "",
           location: item.location ?? "",
@@ -154,12 +155,20 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
       const details = event.getOccurrenceDetails(recurrenceId);
       add(details.item ?? event, details.startDate, details.endDate, recurrenceId);
     };
+    const before = ret.length;
     try {
       if (repeats) {
+        // The times that ended before the range (with a day to spare) aren't looked at closer, unless
+        // they were changed (which can move them into it). A change of all the times after one
+        // (RANGE=THISANDFUTURE) can move them all, so then every one is.
+        const skipBefore = (event.rangeExceptions.length === 0) ? ICAL.Time.fromJSDate(new Date(from.getTime() - lengthOf(event) - 24 * 3600 * 1000), false) : undefined;
         const recur = event.iterator();
         let next;
         let count = 0;
         while ((next = recur.next()) && (next.compare(toTime) < 0) && (count++ < 50000)) {
+          if (skipBefore && (next.compare(skipBefore) < 0) && !changedTimeAt(event, next)) {
+            continue;
+          }
           addTime(next);
         }
         // (a time after these that was changed to one before the end)
@@ -172,7 +181,10 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
         add(event, event.startDate, event.endDate);
       }
     } catch (e) {
-      add(event, event.startDate, event.endDate);
+      // (when its times can't be worked out, it's shown once, unless some of them were shown already)
+      if (ret.length === before) {
+        add(event, event.startDate, event.endDate);
+      }
     }
   }
 
@@ -204,6 +216,15 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
     }
   }
   return ret.sort((a, b) => (Number(b.allDay) - Number(a.allDay)) || (a.start.getTime() - b.start.getTime()));
+}
+
+// How long an event lasts, in milliseconds (at least a day, which an all day one without an end has)
+function lengthOf(event: EventType) {
+  try {
+    return Math.max(event.duration.toSeconds(), 24 * 3600) * 1000;
+  } catch (e) {
+    return 24 * 3600 * 1000;
+  }
 }
 
 // The occurrences that are on a day (all day ones end at the start of the day after their last one)

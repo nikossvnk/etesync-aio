@@ -13,6 +13,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { useSyncGate } from "../SyncGate";
 import * as Etebase from "etebase";
 import { useCredentials } from "../credentials";
+import { loadCollection } from "../cached";
 import { kindOf } from "../pim/collections";
 import { StoreState } from "../store";
 import { CachedItem } from "../store/reducers";
@@ -21,13 +22,10 @@ import { Title } from "../widgets/Typography";
 import NotFound from "../widgets/NotFound";
 import AppbarButton from "../widgets/AppbarButton";
 
-import { defaultColor } from "../helpers";
 import { DefaultNavigationProp, RootStackParamList } from "../RootStackParamList";
 
 import ColorBox from "../widgets/ColorBox";
-
-const iconDeleted = (props: any) => (<List.Icon {...props} color="#F20C0C" icon="delete" />);
-const iconChanged = (props: any) => (<List.Icon {...props} color="#FEB115" icon="pencil" />);
+import { defaultColor } from "../constants";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "CollectionChangelog">;
 
@@ -58,8 +56,7 @@ export default function CollectionChangelogScreen(props: PropsType) {
     }
     let cancelled = false;
     (async () => {
-      const colMgr = etebase.getCollectionManager();
-      const itemMgr = colMgr.getItemManager(colMgr.cacheLoad(cachedCollection.cache));
+      const { itemMgr } = loadCollection(etebase, colUid);
       const ret = new Map<string, string>();
       for (const [itemUid, cached] of colCachedItems.entries()) {
         try {
@@ -115,7 +112,9 @@ export default function CollectionChangelogScreen(props: PropsType) {
   function renderEntry(param: { item: CachedItem & { uid: string } }) {
     const item = param.item;
 
-    const icon = (item.isDeleted) ? iconDeleted : iconChanged;
+    const icon = (props: any) => (item.isDeleted) ?
+      <List.Icon {...props} color={theme.colors.error} icon="delete" /> :
+      <List.Icon {...props} color={theme.colors.changed} icon="pencil" />;
 
     // (a bookmark without a title is shown as its link)
     const name = titles.get(item.uid) || item.meta.name || (item.meta as { url?: string }).url || "";
@@ -166,7 +165,7 @@ function RightAction(props: { colUid: string, notebook: boolean }) {
   return (
     <View style={{ flexDirection: "row" }}>
       {/* (notebooks have the screens of the notes, the others the collections page) */}
-      <AppbarButton icon="pencil" title="Edit" onPress={() => (props.notebook) ? navigation.navigate("CollectionEdit", { colUid }) : navigation.navigate("Collections", { colUid })} />
+      <AppbarButton icon="pencil" title="Edit" onPress={() => navigation.navigate("Collections", { colUid })} />
       <AppbarButton icon="account-multiple" title="Members" onPress={() => (props.notebook) ? navigation.navigate("CollectionMembers", { colUid }) : navigation.navigate("Collections", { colUid, share: true })} />
     </View>
   );

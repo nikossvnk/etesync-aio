@@ -27,7 +27,7 @@ export function useSidebarShown() {
 
 // What's searched for in the sidebar, which the notes column shows the results of
 type SearchContextType = { query: string, setQuery: (query: string) => void };
-export const SearchContext = React.createContext<SearchContextType>({ query: "", setQuery: () => undefined });
+const SearchContext = React.createContext<SearchContextType>({ query: "", setQuery: () => undefined });
 
 export function SearchProvider(props: React.PropsWithChildren<unknown>) {
   const [query, setQuery] = React.useState("");

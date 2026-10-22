@@ -9,8 +9,8 @@ import { Linking, Platform, View, TextInput as NativeTextInput } from "react-nat
 import { Text, TouchableRipple } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
-import { AuthField, AuthHeading, AuthInput, AuthLayout, ErrorBox, PasswordField, PrimaryButton, ServerBox } from "../components/Auth";
-import { fonts, useTheme } from "../theme";
+import { AuthField, AuthHeading, AuthInput, AuthLayout, ErrorBox, PasswordField, PrimaryButton, ServerBox, UsernameField } from "../components/Auth";
+import { fonts, Theme, useTheme } from "../theme";
 import { tint } from "../pim/style";
 
 import { useAsyncDispatch } from "../store";
@@ -36,10 +36,10 @@ interface FormErrors {
 type NavigationProp = StackNavigationProp<RootStackParamList, "Signup">;
 
 // How strong a password looks, by its length (the rules only ask for 8 characters)
-function strength(password: string) {
+function strength(password: string, theme: Theme) {
   const len = password.length;
   const level = (len === 0) ? 0 : (len < 8) ? 1 : (len < 12) ? 2 : 3;
-  return { level, label: ["", "Too short", "Okay", "Strong"][level], color: ["", "#F09A5C", "#E0B43C", "#5CC59B"][level] };
+  return { level, label: ["", "Too short", "Okay", "Strong"][level], color: ["", theme.colors.warning, theme.colors.caution, theme.colors.positive][level] };
 }
 
 export default React.memo(function SignupScreen() {
@@ -135,7 +135,7 @@ export default React.memo(function SignupScreen() {
     return <React.Fragment />;
   }
 
-  const pw = strength(password);
+  const pw = strength(password, theme);
 
   return (
     <AuthLayout>
@@ -163,20 +163,7 @@ export default React.memo(function SignupScreen() {
       {(errors.general) && <ErrorBox message={errors.general} />}
       <ServerBox verb="Creating your account on" value={server} onChange={setServer} error={errors.server} />
       <View style={{ gap: 16 }}>
-        <AuthField label="Username" error={errors.username}>
-          <AuthInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            autoFocus
-            returnKeyType="next"
-            onSubmitEditing={() => emailRef.current?.focus()}
-            invalid={!!errors.username}
-            onChangeText={setUsername}
-            accessibilityLabel="Username"
-            value={username}
-          />
-        </AuthField>
+        <UsernameField value={username} onChangeText={setUsername} error={errors.username} onSubmitEditing={() => emailRef.current?.focus()} />
         <AuthField label="Email address" error={errors.email}>
           <AuthInput
             ref={emailRef}
@@ -222,10 +209,10 @@ export default React.memo(function SignupScreen() {
           aria-checked={understood}
           onPress={() => setUnderstood(!understood)}
           style={{ borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12,
-            backgroundColor: tint("#F09A5C", 0.1), borderColor: tint("#F09A5C", 0.4) }}
+            backgroundColor: tint(theme.colors.warning, 0.1), borderColor: tint(theme.colors.warning, 0.4) }}
         >
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-            <MaterialCommunityIcons name={(understood) ? "checkbox-marked" : "checkbox-blank-outline"} size={20} color="#E0864A" />
+            <MaterialCommunityIcons name={(understood) ? "checkbox-marked" : "checkbox-blank-outline"} size={20} color={theme.colors.warning} />
             <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textBody }}>
               <Text style={{ fontFamily: fonts.semibold }}>I understand my password can’t be recovered.</Text> It encrypts my data, so if I lose it, nobody can reset it or restore my data.
             </Text>

@@ -27,8 +27,6 @@ import { addDays, dayCount, isBar, layoutBars, Occurrence, onDay, sameDay, start
 import { Agenda, DayPanel, EventDetails, MiniMonth, panelStyle, SmallButton, SpanBar, TasksDue } from "./CalendarParts";
 import { setTaskDone } from "./TasksScreen";
 
-export type { Occurrence } from "./occurrences";
-
 type CalendarView = "month" | "week" | "day" | "agenda";
 const views: { key: CalendarView, label: string }[] = [
   { key: "day", label: "Day" },

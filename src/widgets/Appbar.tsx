@@ -19,7 +19,7 @@ export function headerStyle(theme: Theme) {
   };
 }
 
-export function headerTitleStyle(theme: Theme) {
+function headerTitleStyle(theme: Theme) {
   return {
     color: theme.colors.text,
     fontFamily: fonts.semibold,

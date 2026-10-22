@@ -24,12 +24,11 @@ import * as C from "../constants";
 import { EventType, timezoneLoadFromName } from "./pim-types";
 import AttendeesField, { AttendeeEntry, attendeesOf, setAttendees } from "./AttendeesField";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
-import { TimezonePicker, timezoneName } from "./widgets";
 import { useDateFormats } from "./format";
 import { sameDay } from "./occurrences";
 import { RepeatChoiceDialog } from "./Dialogs";
 import { addSeconds, bumpSequence, changeOccurrence, excludeOccurrence, findOccurrence, hasChangedTimes, moveTime, updateSeries } from "./recurrence";
-import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString, toTimeString } from "./widgets";
+import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, TimezonePicker, timezoneName, toDateString, toTimeString } from "./widgets";
 
 interface PropsType {
   route: RouteProp<RootStackParamList, "EventEdit">;

@@ -9,6 +9,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 
 import { useSyncGate } from "../SyncGate";
 import { useCredentials } from "../credentials";
+import { loadCollection } from "../cached";
 import { StoreState, useAsyncDispatch } from "../store";
 import { setCacheItem } from "../store/actions";
 import { newNotes, openInEditor } from "../newNotes";
@@ -17,6 +18,7 @@ import { RootStackParamList } from "../RootStackParamList";
 
 import Container from "../widgets/Container";
 import FormButton from "../widgets/FormButton";
+import { useDialogs } from "../pim/Dialogs";
 import LoadingIndicator from "../widgets/LoadingIndicator";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "NoteCreate">;
@@ -35,6 +37,7 @@ export default function NoteCreateScreen(props: PropsType) {
   const etebase = useCredentials()!;
   const dispatch = useAsyncDispatch();
   const creating = React.useRef(false);
+  const dialogs = useDialogs();
 
   const wanted = props.route.params?.colUid ?? filterBy ?? undefined;
   const colUid = (wanted && cacheCollections.has(wanted)) ? wanted : Array.from(cacheCollections.entries())
@@ -51,9 +54,7 @@ export default function NoteCreateScreen(props: PropsType) {
     creating.current = true;
 
     (async () => {
-      const colMgr = etebase.getCollectionManager();
-      const col = colMgr.cacheLoad(cacheCollections.get(colUid)!.cache);
-      const itemMgr = colMgr.getItemManager(col);
+      const { col, itemMgr } = loadCollection(etebase, colUid);
       const meta: NoteMetadata = {
         name: "",
         mtime: (new Date()).getTime(),
@@ -75,7 +76,7 @@ export default function NoteCreateScreen(props: PropsType) {
     return (
       <Container>
         <Paragraph>Notes are kept in notebooks, so there has to be one first.</Paragraph>
-        <FormButton onPress={() => navigation.navigate("CollectionCreate")}>
+        <FormButton onPress={() => dialogs.newCollection("notes", { stay: true })}>
           Create a notebook
         </FormButton>
       </Container>

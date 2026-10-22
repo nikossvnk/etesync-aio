@@ -59,7 +59,8 @@ declare module "ical.js" {
     public get duration(): Duration;
     // The changed times, by the string of their RECURRENCE-ID
     public exceptions: { [recurrenceId: string]: Event };
-    public rangeExceptions: any[];
+    // The changes of all the times after one (RANGE=THISANDFUTURE): their start (Unix time) and key in exceptions
+    public rangeExceptions: [number, string][];
 
     public isRecurring(): boolean;
     public isRecurrenceException(): boolean;

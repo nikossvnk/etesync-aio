@@ -132,6 +132,19 @@ export const syncItems = handleActions(
       }
       return state;
     },
+    [actions.setSyncItemMulti.toString()]: (state: SyncItemsData, action_: any) => {
+      // (typed here, like the batches of the cache below)
+      const action = action_ as Action<{ colUid: string, itemUids: string[] }>;
+      if (action.payload !== undefined) {
+        const { colUid, itemUids } = action.payload;
+        return state.withMutations((state) => {
+          for (const itemUid of itemUids) {
+            state.setIn([colUid, itemUid], true);
+          }
+        });
+      }
+      return state;
+    },
     [actions.unsetSyncItem.toString()]: (state: SyncItemsData, action: Action<{ colUid: string, itemUid: string }>) => {
       if (action.payload !== undefined) {
         return state.removeIn([action.payload.colUid, action.payload.itemUid]);

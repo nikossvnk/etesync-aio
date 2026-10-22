@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useTheme } from "../theme";
+import "../css/state.css";
 
 type ChildProps = {
   className?: string;
@@ -10,7 +12,17 @@ type PropsType = {
 };
 
 export default function Clickable(props: PropsType) {
-  const { renderChild } = props;
+  const { applyToChild, renderChild } = props;
+  const theme = useTheme();
+  const className = `state ${theme.dark ? "dark" : "light"}`;
 
-  return renderChild({});
+  if (applyToChild) {
+    return renderChild({ className });
+  }
+
+  return (
+    <div className={className}>
+      {renderChild({})}
+    </div>
+  );
 }

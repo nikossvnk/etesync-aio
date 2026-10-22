@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Â© 2019 EteSync Authors
+// SPDX-FileCopyrightText: © 2019 EteSync Authors
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
@@ -12,10 +12,9 @@ import { RootStackParamList } from "../RootStackParamList";
 import NoteListScreen, { EmptyNotes } from "./NoteListScreen";
 import { useWideLayout, useWideNavigation } from "../components/WideLayout";
 import { StoreState } from "../store";
-import { fonts } from "../theme";
+import { fonts, useTheme } from "../theme";
 import SearchScreen from "./SearchScreen";
 import NotebookListScreen from "./NotebookListScreen";
-import { useTheme } from "../theme";
 
 interface PropsType {
   route: RouteProp<RootStackParamList, "Home"> | RouteProp<RootStackParamList, "Collection">;

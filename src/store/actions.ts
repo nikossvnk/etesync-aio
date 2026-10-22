@@ -188,6 +188,17 @@ export const setSyncItem = createAction(
   }
 );
 
+// The same for several items of a collection, as one change of the store
+export const setSyncItemMulti = createAction(
+  "SET_SYNC_ITEM_MULTI",
+  (colUid: string, itemUids: string[]) => {
+    return {
+      colUid,
+      itemUids,
+    };
+  }
+);
+
 export const unsetSyncItem = createAction(
   "UNSET_SYNC_ITEM",
   (colUid: string, itemUid: string) => {

@@ -74,7 +74,7 @@ export async function setTaskDone(etebase: Parameters<typeof savePimItem>[0], ta
   return next;
 }
 
-export async function addTask(etebase: Parameters<typeof savePimItem>[0], colUid: string, title: string, parent?: TaskType) {
+async function addTask(etebase: Parameters<typeof savePimItem>[0], colUid: string, title: string, parent?: TaskType) {
   const task = new TaskType(null);
   task.uid = uuid.v4();
   task.title = title;
@@ -172,7 +172,7 @@ function TaskRow(props: RowProps) {
             </View>
           </View>
           {(priorityName(task) === "High") && (
-            <MaterialCommunityIcons name="flag" size={16} color="#F09A5C" accessibilityLabel="High priority" />
+            <MaterialCommunityIcons name="flag" size={16} color={theme.colors.warning} accessibilityLabel="High priority" />
           )}
           {due && (
             <Text style={[styles.due, { color: (task.overdue && !task.finished) ? theme.colors.error : theme.colors.textMuted }]}>{due}</Text>

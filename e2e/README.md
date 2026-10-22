@@ -52,7 +52,9 @@ fill the lists the tests look in; `E2E_KEEP_DATA=1` skips that. Running some of 
 ## Writing tests
 
 The helpers are in `lib.js`. Tests create the notes they need with `api.addNote()` (directly on the
-server), rather than relying on what's already in the account. To check what a note shows use
+server), rather than relying on what's already in the account. A test can also have an account of
+its own, `newAccount()`, which its session logs in to with `login(account)`; `waitFor()` waits for a
+change to reach the server, and `collectionOf()` gives the first collection of a type. To check what a note shows use
 `noteText()` or `viewerText()`: they fail when a saved note doesn't open in the viewer or doesn't
 show its text there, so that "opening a note shows it" is part of every test that reads a note.
 

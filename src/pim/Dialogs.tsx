@@ -13,18 +13,20 @@ import { useDispatch } from "react-redux";
 
 import { useCredentials } from "../credentials";
 import { pushMessage, setSettings } from "../store/actions";
-import { store, StoreState } from "../store";
+import { store } from "../store";
 import { fonts, useTheme } from "../theme";
 import { saveFile } from "../import-export";
-import { createCollection, CollectionInfo, Kind, kindOrder, kinds, swatches, useCollectionInfos } from "./collections";
+import { createCollection, Kind, kindOrder, kinds, useCollectionInfos } from "./collections";
 import { acceptedFiles, Destination, Duplicates, ImportFile, isAccepted, KindResult, kindNoun, Parsed, readFiles, runImport } from "./importFiles";
 import { useDateFormats } from "./format";
 import { CollectionPicker } from "./widgets";
 import { mono, tint } from "./style";
 import * as Etebase from "etebase";
+import { swatches } from "../constants";
 
 interface DialogsType {
-  newCollection: (kind?: Kind) => void;
+  // (stay: the screen it's opened from stays, e.g. a new note that waits for a notebook to be in)
+  newCollection: (kind?: Kind, options?: { stay?: boolean }) => void;
   importFiles: (colUid?: string) => void;
 }
 
@@ -35,16 +37,16 @@ export function useDialogs() {
 }
 
 export function DialogsProvider(props: React.PropsWithChildren<unknown>) {
-  const [open, setOpen] = React.useState<{ type: "new", kind: Kind } | { type: "import", colUid?: string }>();
+  const [open, setOpen] = React.useState<{ type: "new", kind: Kind, stay?: boolean } | { type: "import", colUid?: string }>();
   const value = React.useMemo(() => ({
-    newCollection: (kind?: Kind) => setOpen({ type: "new", kind: kind ?? "calendar" }),
+    newCollection: (kind?: Kind, options?: { stay?: boolean }) => setOpen({ type: "new", kind: kind ?? "calendar", stay: options?.stay }),
     importFiles: (colUid?: string) => setOpen({ type: "import", colUid }),
   }), []);
   return (
     <DialogsContext.Provider value={value}>
       {props.children}
       {(open?.type === "new") && (
-        <NewCollectionDialog kind={open.kind} onClose={() => setOpen(undefined)} onImport={() => setOpen({ type: "import" })} />
+        <NewCollectionDialog kind={open.kind} stay={open.stay} onClose={() => setOpen(undefined)} onImport={() => setOpen({ type: "import" })} />
       )}
       {(open?.type === "import") && (
         <ImportDialog colUid={open.colUid} onClose={() => setOpen(undefined)} />
@@ -239,7 +241,7 @@ const placeholders: { [kind in Kind]: string } = {
   bookmarks: "e.g. Work links, Reading list",
 };
 
-function NewCollectionDialog(props: { kind: Kind, onClose: () => void, onImport: () => void }) {
+function NewCollectionDialog(props: { kind: Kind, stay?: boolean, onClose: () => void, onImport: () => void }) {
   const theme = useTheme();
   const etebase = useCredentials()!;
   const dispatch = useDispatch();
@@ -263,12 +265,14 @@ function NewCollectionDialog(props: { kind: Kind, onClose: () => void, onImport:
     props.onClose();
     // (to it: its section, or the notes of the notebook, or the bookmarks of the list)
     if (kind === "notes") {
-      const viewSettings = (store.getState() as unknown as StoreState).settings.viewSettings;
+      const viewSettings = store.getState().settings.viewSettings;
       dispatch(setSettings({ viewSettings: { ...viewSettings, filterBy: colUid } }) as any);
     } else if (kind === "bookmarks") {
       dispatch(setSettings({ bookmarksFilter: colUid }) as any);
     }
-    navigation.navigate("Root", { screen: info.screen });
+    if (!props.stay) {
+      navigation.navigate("Root", { screen: info.screen });
+    }
   }
 
   return (
@@ -510,7 +514,7 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
         {mainKind && <Button label={`Open ${(mainKind === "notes") ? "notes" : kinds[mainKind].noun.replace(/ list$/, "s").replace("address book", "contacts")}`} primary onPress={() => {
           props.onClose();
           if ((mainKind === "notes") && results?.[0]) {
-            const viewSettings = (store.getState() as unknown as StoreState).settings.viewSettings;
+            const viewSettings = store.getState().settings.viewSettings;
             store.dispatch(setSettings({ viewSettings: { ...viewSettings, filterBy: results[0].colUid } }) as any);
           } else if ((mainKind === "bookmarks") && results?.[0]) {
             store.dispatch(setSettings({ bookmarksFilter: results[0].colUid }) as any);
@@ -673,8 +677,8 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
               </View>
             ))}
             {(parsed.unreadable.length > 0) && (
-              <View style={[styles.summaryRow, { alignItems: "flex-start", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, backgroundColor: tint("#F09A5C", 0.08) }]}>
-                <MaterialCommunityIcons name="alert-outline" size={16} color="#F09A5C" style={{ marginTop: 2 }} />
+              <View style={[styles.summaryRow, { alignItems: "flex-start", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, backgroundColor: tint(theme.colors.warning, 0.08) }]}>
+                <MaterialCommunityIcons name="alert-outline" size={16} color={theme.colors.warning} style={{ marginTop: 2 }} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={{ color: theme.colors.text }}>
                     {parsed.unreadable.length} {(parsed.unreadable.length === 1) ? "entry" : "entries"} couldn’t be read
@@ -694,8 +698,6 @@ function ImportDialog(props: { colUid?: string, onClose: () => void }) {
     </Frame>
   );
 }
-
-export type { CollectionInfo };
 
 const styles = StyleSheet.create({
   dialog: {

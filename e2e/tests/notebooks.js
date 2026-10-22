@@ -57,9 +57,7 @@ run(async () => {
 
   // Created and deleted while offline: nothing reaches the server
   await A.ctx.setOffline(true); await A.wait(800);
-  await A.btn(/^new$/i).click(); await A.wait(1500);
-  await A.vis('input[aria-label="Display name (title)"]').fill("Ghost " + n);
-  await A.btn(/^save$/i).click(); await A.wait(3000);
+  await A.createNotebook("Ghost " + n);
   await A.home();
   check("a notebook made offline is listed", await A.has("Ghost " + n));
   await A.deleteNotebook("Ghost " + n); await A.home();

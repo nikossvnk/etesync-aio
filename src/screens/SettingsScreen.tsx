@@ -322,7 +322,7 @@ const SettingsScreen = function _SettingsScreen() {
   async function onExport() {
     setExporting(true);
     try {
-      const { data, count } = await exportNotes(etebase!, store.getState() as unknown as StoreState);
+      const { data, count } = await exportNotes(etebase!, store.getState());
       const name = `etesync-notes-${format(new Date(), "yyyy-MM-dd")}.zip`;
       if (await saveFile(name, data, "application/zip")) {
         dispatch(pushMessage({ message: `Exported ${count} ${(count === 1) ? "note" : "notes"} to ${name}`, severity: "success" }) as any);
@@ -346,7 +346,7 @@ const SettingsScreen = function _SettingsScreen() {
         dispatch(pushMessage({ message: "There are no notes (Markdown files) in this file", severity: "warning" }) as any);
         return;
       }
-      const { imported, skipped, notebooksCreated } = await importNotes(etebase!, store.getState() as unknown as StoreState, notes);
+      const { imported, skipped, notebooksCreated } = await importNotes(etebase!, store.getState(), notes);
       const parts = [`Imported ${imported} ${(imported === 1) ? "note" : "notes"}`];
       if (notebooksCreated > 0) {
         parts.push(`${notebooksCreated} new ${(notebooksCreated === 1) ? "notebook" : "notebooks"}`);

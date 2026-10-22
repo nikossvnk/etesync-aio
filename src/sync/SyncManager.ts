@@ -3,16 +3,13 @@
 
 import * as Etebase from "etebase";
 
-import * as BackgroundFetch from "expo-background-fetch";
-import * as TaskManager from "expo-task-manager";
-
-import { store, persistor, StoreState, asyncDispatch } from "../store";
+import { store, asyncDispatch } from "../store";
 
 import { credentialsSelector } from "../credentials";
-import { setSyncCollection, unsetSyncCollection, setSyncGeneral, setCacheCollection, unsetCacheCollection, setPendingCollection, unsetPendingCollection, setCacheItem, setCacheItemMulti, setSyncItem, unsetSyncItem, addError, performSync, pushMessage, setSyncStatus } from "../store/actions";
+import { setSyncCollection, unsetSyncCollection, setSyncGeneral, setCacheCollection, unsetCacheCollection, setPendingCollection, unsetPendingCollection, setCacheItem, setCacheItemMulti, setSyncItemMulti, unsetSyncItem, addError, performSync, pushMessage, setSyncStatus } from "../store/actions";
 import { CachedCollection, CachedItem } from "../store/reducers";
 import * as C from "../constants";
-import { startTask, arrayToChunkIterator } from "../helpers";
+import { arrayToChunkIterator } from "../helpers";
 import { logger } from "../logging";
 
 const cachedSyncManager = new Map<string, SyncManager>();
@@ -41,7 +38,7 @@ export class SyncManager {
   protected resyncNeeded = false;
 
   private async fetchCollection(col: Etebase.Collection) {
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     const etebase = (await credentialsSelector(storeState))!;
     const syncCollection = storeState.sync.collections.get(col.uid, undefined);
 
@@ -55,7 +52,7 @@ export class SyncManager {
       const items = await itemMgr.list({ stoken, limit });
       // Never overwrite items that have local changes waiting to be pushed.
       // The next push will detect the conflict and resolve it.
-      const pending = (store.getState() as unknown as StoreState).sync.items.get(col.uid);
+      const pending = store.getState().sync.items.get(col.uid);
       const data = (pending) ? items.data.filter((item) => !pending.has(item.uid)) : items.data;
       if (data.length !== items.data.length) {
         this.resyncNeeded = true;
@@ -71,7 +68,7 @@ export class SyncManager {
   }
 
   private async fetchAllCollections() {
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     const etebase = (await credentialsSelector(storeState))!;
     const syncGeneral = storeState.sync.general;
 
@@ -127,7 +124,7 @@ export class SyncManager {
   }
 
   private getCachedItem(colUid: string, itemUid: string) {
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     return storeState.allCache.items.get(colUid)?.get(itemUid);
   }
 
@@ -256,12 +253,12 @@ export class SyncManager {
   }
 
   private getPendingCollection(colUid: string) {
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     return storeState.sync.pendingCollections.get(colUid);
   }
 
   private getCachedCollection(colUid: string) {
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     return storeState.allCache.collections.get(colUid);
   }
 
@@ -340,7 +337,7 @@ export class SyncManager {
   }
 
   private async pushCollections(etebase: Etebase.Account) {
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     const colMgr = etebase.getCollectionManager();
 
     for (const [colUid, pending] of storeState.sync.pendingCollections.entries()) {
@@ -382,11 +379,11 @@ export class SyncManager {
   }
 
   private async pushAll() {
-    const etebase = (await credentialsSelector(store.getState() as unknown as StoreState))!;
+    const etebase = (await credentialsSelector(store.getState()))!;
     // Notebooks go first, notes can't be pushed to a notebook the server doesn't know yet
     await this.pushCollections(etebase);
 
-    const storeState = store.getState() as unknown as StoreState;
+    const storeState = store.getState();
     const cacheCollections = storeState.allCache.collections;
     const cacheItems = storeState.allCache.items;
     const syncItemsAll = storeState.sync.items;
@@ -478,7 +475,7 @@ export class SyncManager {
       throw e;
     } finally {
       this.isSyncing = false;
-      if (this.resyncNeeded && (store.getState() as unknown as StoreState).connection?.isConnected !== false) {
+      if (this.resyncNeeded && store.getState().connection?.isConnected !== false) {
         setTimeout(() => {
           if (this.resyncNeeded) {
             store.dispatch(performSync(this.sync()));
@@ -501,11 +498,12 @@ export function requestSync(etebase: Etebase.Account, localChanges = false) {
 }
 
 // Save items to the local cache and queue them to be pushed to the server.
-// This always works, even when offline.
+// This always works, even when offline. (all of them at once, as each change of the store makes the
+// screens look at it again)
 export async function saveItemsLocally(etebase: Etebase.Account, col: Etebase.Collection, itemMgr: Etebase.ItemManager, items: Etebase.Item[]) {
-  for (const item of items) {
-    await asyncDispatch(setCacheItem(col, itemMgr, item));
-    store.dispatch(setSyncItem(col.uid, item.uid));
+  if (items.length > 0) {
+    await asyncDispatch(setCacheItemMulti(col.uid, itemMgr, items));
+    store.dispatch(setSyncItemMulti(col.uid, items.map((item) => item.uid)));
   }
   requestSync(etebase, true);
 }
@@ -513,7 +511,7 @@ export async function saveItemsLocally(etebase: Etebase.Account, col: Etebase.Co
 // Save a notebook to the local cache and queue it to be pushed to the server.
 // This always works, even when offline.
 export async function saveCollectionLocally(etebase: Etebase.Account, colMgr: Etebase.CollectionManager, col: Etebase.Collection, isNew: boolean) {
-  const pending = (store.getState() as unknown as StoreState).sync.pendingCollections.get(col.uid);
+  const pending = store.getState().sync.pendingCollections.get(col.uid);
   await asyncDispatch(setCacheCollection(colMgr, col));
   store.dispatch(setPendingCollection(col.uid, (isNew || pending?.isNew) ? { isNew: true } : {}));
   requestSync(etebase, true);
@@ -522,7 +520,7 @@ export async function saveCollectionLocally(etebase: Etebase.Account, colMgr: Et
 // Remove a notebook locally and queue the deletion to be pushed to the server.
 // Expects a collection that delete() was already called on.
 export function deleteCollectionLocally(etebase: Etebase.Account, colMgr: Etebase.CollectionManager, col: Etebase.Collection) {
-  const pending = (store.getState() as unknown as StoreState).sync.pendingCollections.get(col.uid);
+  const pending = store.getState().sync.pendingCollections.get(col.uid);
   store.dispatch(unsetCacheCollection(colMgr, col.uid));
   if (pending?.isNew) {
     // It was never uploaded, so there is nothing to delete on the server
@@ -531,63 +529,4 @@ export function deleteCollectionLocally(etebase: Etebase.Account, colMgr: Etebas
     store.dispatch(setPendingCollection(col.uid, { deletedCache: Etebase.toBase64(colMgr.cacheSave(col)) }));
   }
   requestSync(etebase, true);
-}
-
-function persistorLoaded() {
-  return new Promise((resolve, _reject) => {
-    const subscription = {} as { unsubscribe: () => void };
-    subscription.unsubscribe = persistor.subscribe(() => {
-      const { bootstrapped } = persistor.getState();
-      if (bootstrapped) {
-        resolve(true);
-        subscription.unsubscribe();
-      }
-    });
-    if (persistor.getState().bootstrapped) {
-      resolve(true);
-      subscription.unsubscribe();
-    }
-  });
-}
-
-const BACKGROUND_SYNC_TASK_NAME = "SYNCMANAGER_SYNC";
-
-TaskManager.defineTask(BACKGROUND_SYNC_TASK_NAME, async () => {
-  const timeout = startTask(() => true, 27 * 1000); // Background fetch is limited to 30 seconds.
-
-  try {
-    await persistorLoaded();
-    const beforeState = store.getState() as unknown as StoreState;
-    const etebase = await credentialsSelector(beforeState);
-
-    if (!etebase) {
-      return BackgroundFetch.BackgroundFetchResult.Failed;
-    }
-
-    const syncManager = SyncManager.getManager(etebase);
-    const sync = syncManager.sync();
-    Promise.race([timeout, sync]);
-    store.dispatch(performSync(sync));
-
-    const afterState = store.getState() as unknown as StoreState;
-    const receivedNewData =
-      (beforeState.allCache.collections !== afterState.allCache.collections) ||
-      (beforeState.allCache.items !== afterState.allCache.items);
-
-    return receivedNewData ? BackgroundFetch.BackgroundFetchResult.NewData : BackgroundFetch.BackgroundFetchResult.NoData;
-  } catch (error) {
-    return BackgroundFetch.BackgroundFetchResult.Failed;
-  }
-});
-
-export function registerSyncTask(_username: string) {
-  return BackgroundFetch.registerTaskAsync(BACKGROUND_SYNC_TASK_NAME, {
-    minimumInterval: 4 * 60 * 60, // 4 hours
-    stopOnTerminate: false,
-    startOnBoot: true,
-  });
-}
-
-export function unregisterSyncTask(_username: string) {
-  return BackgroundFetch.unregisterTaskAsync(BACKGROUND_SYNC_TASK_NAME);
 }

@@ -33,7 +33,7 @@ type MenuItem = {
 };
 
 // The calendar, the tasks and the contacts, which are next to the notes
-export const pimMenuItems: MenuItem[] = [
+const pimMenuItems: MenuItem[] = [
   {
     title: "Search all",
     path: "SearchAll",

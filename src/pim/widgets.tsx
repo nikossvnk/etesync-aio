@@ -57,7 +57,7 @@ function dateOfIso(value: string) {
 }
 
 // A typed date, in the order of the setting (or as "YYYY-MM-DD"); undefined if it isn't one
-export function parseTypedDate(text: string, fmt: DateFormats): string | undefined {
+function parseTypedDate(text: string, fmt: DateFormats): string | undefined {
   const t = text.trim();
   if (dateOfIso(t)) {
     return t;
@@ -75,7 +75,7 @@ export function parseTypedDate(text: string, fmt: DateFormats): string | undefin
 }
 
 // A typed time, e.g. "9", "9:30", "0930", "14:00" or "2:30 pm"; undefined if it isn't one
-export function parseTypedTime(text: string): string | undefined {
+function parseTypedTime(text: string): string | undefined {
   const m = /^(\d{1,2})(?::?(\d{2}))?\s*([ap])?\.?\s*m?\.?$/i.exec(text.trim());
   if (!m) {
     return undefined;
@@ -265,37 +265,6 @@ export function CollectionPicker(props: { collections: PimCollection[], value: s
   );
 }
 
-// A row of chips to choose between all of the collections or one of them
-export function CollectionChips(props: { collections: PimCollection[], value: string | null, onChange: (colUid: string | null) => void, allLabel: string }) {
-  const theme = useTheme();
-  const chip = (colUid: string | null, label: string, color?: string) => {
-    const selected = props.value === colUid;
-    return (
-      <TouchableRipple
-        key={colUid ?? "all"}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ selected }}
-        aria-selected={selected}
-        onPress={() => props.onChange(colUid)}
-        style={[styles.chip, { borderColor: theme.colors.border },
-          (selected) ? { backgroundColor: theme.colors.chipActive, borderColor: theme.colors.chipActive } : { backgroundColor: theme.colors.surface }]}
-      >
-        <View style={styles.pickerInner}>
-          {color && <ColorDot color={color} size={8} style={{ marginRight: 6 }} />}
-          <Text style={{ fontSize: 13, color: (selected) ? theme.colors.onChipActive : theme.colors.textBody }}>{label}</Text>
-        </View>
-      </TouchableRipple>
-    );
-  };
-  return (
-    <View style={styles.chips}>
-      {chip(null, props.allLabel)}
-      {props.collections.map((col) => chip(col.colUid, col.name, col.color))}
-    </View>
-  );
-}
-
 export function EmptyState(props: { icon: string, title: string, text?: string, action?: React.ReactNode }) {
   const theme = useTheme();
   return (
@@ -395,11 +364,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
   chip: {
     borderWidth: 1,
     borderRadius: 16,
@@ -481,7 +445,7 @@ const styles = StyleSheet.create({
 // How often something repeats. "custom" is a rule this app can't make (e.g. on some days of the
 // week), which is kept as it is unless another one is chosen.
 export type RepeatKey = "none" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "custom";
-export const repeatNames: { [key in RepeatKey]: string } = {
+const repeatNames: { [key in RepeatKey]: string } = {
   none: "Never",
   DAILY: "Daily",
   WEEKLY: "Weekly",

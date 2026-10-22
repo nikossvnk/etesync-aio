@@ -4,7 +4,7 @@
 // exporting a list, and the bookmark lists in Settings → Collections and the New collection dialog.
 // What's done is checked on the server. It uses an account of its own (made for each run).
 const http = require("http");
-const { launch, session, run, check, config, Etebase, unique } = require("../lib");
+const { launch, session, run, check, config, Etebase, unique, waitFor } = require("../lib");
 
 const bookmarkType = "etebase.bookmark";
 
@@ -25,16 +25,6 @@ async function lists(etebase) {
     ret.push({ col, name: col.getMeta().name, bookmarks });
   }
   return ret;
-}
-
-async function waitFor(fn) {
-  for (let i = 0; i < 20; i++) {
-    if (await fn()) {
-      return true;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
 }
 
 run(async () => {
@@ -70,13 +60,8 @@ run(async () => {
 
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });
-  const { p, vis, btn, wait } = A;
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(9000);
+  const { p, vis, wait } = A;
+  await A.login({ username, password }, 9000);
   const sidebar = p.locator('[data-testid="sidebar"] >> visible=true');
   const side = (label) => sidebar.getByRole("button", { name: label, exact: true });
   const list = p.locator('[data-testid="bookmark-list"] >> visible=true');

@@ -2,20 +2,9 @@
 // server a few times), what changed since the one before, bringing back an earlier one (checked on
 // the server: it's the item's content and title again, as a new version), and what's shown offline.
 // It uses an account of its own (made for each run).
-const { launch, session, run, check, config, Etebase, unique } = require("../lib");
+const { launch, session, run, check, Etebase, unique, newAccount, waitFor, collectionOf, sleep } = require("../lib");
 
 const types = { notes: "etebase.md.note", calendar: "etebase.vevent" };
-
-async function collection(etebase, type) {
-  for (let i = 0; i < 20; i++) {
-    const col = (await etebase.getCollectionManager().list([type], { limit: 50 })).data.find((x) => !x.isDeleted);
-    if (col) {
-      return col;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error(`No collection of ${type}`);
-}
 
 // Saves an item on the server once for each of its versions (each is a revision), a second apart
 async function addVersions(etebase, col, versions) {
@@ -23,7 +12,7 @@ async function addVersions(etebase, col, versions) {
   const item = await itemMgr.create({ name: versions[0].name, mtime: Date.now() }, versions[0].content);
   await itemMgr.batch([item]);
   for (const v of versions.slice(1)) {
-    await new Promise((r) => setTimeout(r, 1100));
+    await sleep(1100);
     item.setMeta({ ...item.getMeta(), name: v.name, mtime: Date.now() });
     await item.setContent(v.content);
     await itemMgr.batch([item]);
@@ -40,16 +29,7 @@ async function serverItem(etebase, col, uid) {
 }
 
 let last;
-async function waitForItem(etebase, col, uid, fn) {
-  for (let i = 0; i < 20; i++) {
-    last = await serverItem(etebase, col, uid);
-    if (fn(last)) {
-      return true;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
-}
+const waitForItem = (etebase, col, uid, fn) => waitFor(async () => fn(last = await serverItem(etebase, col, uid)));
 
 const pad = (x) => String(x).padStart(2, "0");
 const icalDate = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
@@ -61,9 +41,7 @@ const ics = (uid, title, location) => [
 
 run(async () => {
   const n = unique();
-  const username = `aio-hist-${n}`;
-  const password = "aio-tester-password";
-  const etebase = await Etebase.Account.signup({ username, email: `${username}@example.invalid` }, password, config.serverUrl);
+  const { username, password, etebase } = await newAccount("aio-hist");
 
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });
@@ -74,16 +52,11 @@ run(async () => {
   // (whitespace as one space: the labels for screen readers are blocks of their own in the text)
   const shown = async () => (await vis('[data-testid="history-version"]').innerText()).replace(/\s+/g, " ");
 
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(8000);
+  await A.login({ username, password });
   await btn(/^finish$/i).click(); await wait(6000);
 
   // A note saved three times: the second added a line and changed one, the third changed the title
-  const notes = await collection(etebase, types.notes);
+  const notes = await collectionOf(etebase, types.notes);
   const first = { name: `Plan ${n}`, content: "Kickoff with design and eng.\n\n- Ship offline mode" };
   const second = { name: `Plan ${n}`, content: "Kickoff with design, eng and support.\n\n- Ship offline mode\n- Cut response times" };
   const third = { name: `Q4 plan ${n}`, content: second.content };
@@ -122,7 +95,7 @@ run(async () => {
   await btn(/^back$/i).click(); await wait(1500);
 
   // An event whose place changed
-  const calendar = await collection(etebase, types.calendar);
+  const calendar = await collectionOf(etebase, types.calendar);
   const eventUid = `lunch-${n}`;
   const eventItem = await addVersions(etebase, calendar, [
     { name: eventUid, content: ics(eventUid, `Lunch ${n}`, "Room 2") },

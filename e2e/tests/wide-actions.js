@@ -44,7 +44,7 @@ run(async () => {
   check("members opens the members", path() === "/notebook/ID/members", path());
   await A.back();
   await bar("Edit").click(); await A.wait(2000);
-  check("edit opens the notebook's form", path() === "/notebook/ID/edit", path());
+  check("edit opens the notebook in the collections", path() === "/settings/collections", path());
   await A.back(); await A.back();
 
   // A note

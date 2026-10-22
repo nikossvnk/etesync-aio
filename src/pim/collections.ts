@@ -11,9 +11,9 @@ import { useSelector } from "react-redux";
 
 import { store, StoreState } from "../store";
 import { deleteCollectionLocally, saveCollectionLocally } from "../sync/SyncManager";
+import { loadCollection } from "../cached";
 import * as C from "../constants";
 import { saveFile } from "../import-export";
-import { defaultColor } from "./data";
 import { bookmarksFrom, bookmarksToHtml } from "../bookmarks";
 
 export type Kind = "calendar" | "contacts" | "tasks" | "notes" | "bookmarks";
@@ -35,18 +35,6 @@ export function exportExtension(kind: Kind) {
 export function kindOf(type: string): Kind | undefined {
   return kindOrder.find((k) => kinds[k].type === type);
 }
-
-// The colours to choose from (any other one a collection has is kept)
-export const swatches: { name: string, color: string }[] = [
-  { name: "Blue", color: "#7B98F2" },
-  { name: "Orange", color: "#F09A5C" },
-  { name: "Green", color: "#5CC59B" },
-  { name: "Purple", color: "#B794E6" },
-  { name: "Pink", color: "#E8838F" },
-  { name: "Yellow", color: "#F2C94C" },
-  { name: "Teal", color: "#5BC0C8" },
-  { name: "Grey", color: "#9A9CA3" },
-];
 
 export interface CollectionInfo {
   colUid: string;
@@ -82,7 +70,7 @@ export function useCollectionInfos(etebase: Etebase.Account | null | undefined):
         kind,
         name: col.meta.name ?? "",
         description: col.meta.description ?? "",
-        color: (col.meta.color || defaultColor).slice(0, 7),
+        color: (col.meta.color || C.defaultColor).slice(0, 7),
         items: items.get(colUid)?.count((x) => !x.isDeleted) ?? 0,
         mtime: col.meta.mtime,
         accessLevel,
@@ -90,24 +78,6 @@ export function useCollectionInfos(etebase: Etebase.Account | null | undefined):
     }
     return ret.sort((a, b) => a.name.localeCompare(b.name));
   }, [etebase, collections, items]);
-}
-
-function loadCollection(etebase: Etebase.Account, colUid: string) {
-  const cached = (store.getState() as unknown as StoreState).allCache.collections.get(colUid);
-  if (!cached) {
-    throw new Error("The collection isn't there anymore");
-  }
-  const colMgr = etebase.getCollectionManager();
-  return { colMgr, col: colMgr.cacheLoad(cached.cache) };
-}
-
-// The access level of a collection (it's in the collection, which only the cache entry has)
-export function accessLevelOf(etebase: Etebase.Account, colUid: string) {
-  try {
-    return loadCollection(etebase, colUid).col.accessLevel;
-  } catch (e) {
-    return Etebase.CollectionAccessLevel.ReadOnly;
-  }
 }
 
 export async function createCollection(etebase: Etebase.Account, kind: Kind, meta: { name: string, description?: string, color?: string }) {
@@ -133,7 +103,7 @@ export function deleteCollection(etebase: Etebase.Account, colUid: string) {
 // Saves a calendar or task list as an .ics file, an address book as a .vcf file, a notebook as a
 // Markdown file (its notes one after the other), a bookmark list as a browser's bookmark file (.html)
 export async function exportCollection(etebase: Etebase.Account, colUid: string) {
-  const state = store.getState() as unknown as StoreState;
+  const state = store.getState();
   const { colMgr, col } = loadCollection(etebase, colUid);
   const kind = kindOf(col.getCollectionType())!;
   const name = (col.getMeta().name || kinds[kind].noun).replace(/[\\/:*?"<>|]/g, "_");

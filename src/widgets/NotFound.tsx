@@ -1,6 +1,7 @@
 import { View, StyleSheet } from "react-native";
-import { Subheading, Title } from "react-native-paper";
+import { Subheading } from "react-native-paper";
 import { useTheme } from "../theme";
+import { Title } from "./Typography";
 
 interface PropsType {
   message?: string;

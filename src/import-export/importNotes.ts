@@ -8,7 +8,7 @@ import { saveCollectionLocally, saveItemsLocally } from "../sync/SyncManager";
 export type ImportedNote = { notebook: string, name: string, content: string };
 
 // The notebook of the files that aren't in a folder
-export const defaultImportNotebook = "Imported";
+const defaultImportNotebook = "Imported";
 
 // The notes in a zip as the export makes it: a folder for every notebook, with a Markdown file for
 // every note in it, named after its title. Other files are left out (and files in folders in the

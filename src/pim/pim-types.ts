@@ -6,7 +6,7 @@ import * as zones from "./data/zones.json";
 import moment from "moment";
 import * as uuid from "uuid";
 
-export const PRODID = "-//iCal.js EteSync iOS";
+const PRODID = "-//iCal.js EteSync iOS";
 
 export interface PimType {
   uid: string;
@@ -53,7 +53,7 @@ export function timezoneLoadFromName(timezone: string | null) {
   return retZone;
 }
 
-export function parseString(content: string) {
+function parseString(content: string) {
   content = content.replace(/^[a-zA-Z0-9]*\./gm, ""); // FIXME: ugly hack to ignore item groups.
   return new ICAL.Component(ICAL.parse(content));
 }
@@ -219,12 +219,6 @@ export enum TaskPriorityType {
   High = 1,
   Medium = 5,
   Low = 9,
-}
-
-export let TaskTags = ["Work", "Home"];
-
-export function setTaskTags(tags: string[]) {
-  TaskTags = tags;
 }
 
 export class TaskType extends EventType {

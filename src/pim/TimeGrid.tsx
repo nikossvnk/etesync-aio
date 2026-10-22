@@ -18,7 +18,7 @@ export { mono, tint };
 import { addDays, initials, isBar, layoutBars, Occurrence } from "./occurrences";
 import { SpanBar } from "./CalendarParts";
 
-export const hourHeight = 48;
+const hourHeight = 48;
 const barHeight = 24;
 const gutterWidth = 56;
 const dayMinutes = 24 * 60;
@@ -373,9 +373,9 @@ export default function TimeGrid(props: PropsType) {
                   <View
                     pointerEvents="none"
                     testID="now-line"
-                    style={[styles.now, { top: (now.getHours() * 60 + now.getMinutes()) / 60 * hourHeight }]}
+                    style={[styles.now, { backgroundColor: theme.colors.danger, top: (now.getHours() * 60 + now.getMinutes()) / 60 * hourHeight }]}
                   >
-                    <View style={styles.nowDot} />
+                    <View style={[styles.nowDot, { backgroundColor: theme.colors.danger }]} />
                   </View>
                 )}
               </View>
@@ -494,7 +494,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: 2,
     zIndex: 6,
-    backgroundColor: "#F06A6A",
   },
   nowDot: {
     position: "absolute",
@@ -503,6 +502,5 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#F06A6A",
   },
 });

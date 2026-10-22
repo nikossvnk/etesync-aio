@@ -8,14 +8,15 @@
 import * as React from "react";
 import * as Etebase from "etebase";
 import { useSelector } from "react-redux";
+import { Map as ImmutableMap } from "immutable";
 
 import { store, StoreState } from "../store";
-import { CachedCollection, CachedItem } from "../store/reducers";
+import { CachedCollection, CachedCollectionsData, CachedItem, CachedItemsData } from "../store/reducers";
 import { pushMessage } from "../store/actions";
-import { saveCollectionLocally, saveItemsLocally } from "../sync/SyncManager";
+import { saveItemsLocally } from "../sync/SyncManager";
+import { findItem, loadCollection } from "../cached";
 import { PimType } from "./pim-types";
-
-export const defaultColor = "#8BC34A";
+import { defaultColor } from "../constants";
 
 export interface PimCollection {
   colUid: string;
@@ -73,25 +74,46 @@ async function parseItem<T extends PimType>(colMgr: Etebase.CollectionManager, c
   return ret;
 }
 
-// All of the (not deleted) items of the collections of a type, parsed. Undefined while loading.
-export function usePimItems<T extends PimType>(etebase: Etebase.Account | null | undefined, colType: string, parse: (content: string) => T): T[] | undefined {
-  const cachedCollections = useSelector((state: StoreState) => state.allCache.collections);
-  const cachedItems = useSelector((state: StoreState) => state.allCache.items);
-  const [ret, setRet] = React.useState<T[]>();
+// The cache entries of the collections of a type and their items. It's the same object while none
+// of them changed (a note being saved doesn't change the events'), so their items are only parsed
+// again then.
+export interface TypeEntries {
+  collections: [string, CachedCollection][];
+  items: (ImmutableMap<string, CachedItem> | undefined)[];
+}
 
-  React.useEffect(() => {
-    if (!etebase) {
-      return undefined;
-    }
-    let cancel = false;
-    (async () => {
+const lastEntries = new Map<string, { allCollections: CachedCollectionsData, allItems: CachedItemsData, entries: TypeEntries }>();
+
+export function entriesOfType(state: StoreState, colType: string): TypeEntries {
+  const { collections: allCollections, items: allItems } = state.allCache;
+  const last = lastEntries.get(colType);
+  if (last && (last.allCollections === allCollections) && (last.allItems === allItems)) {
+    return last.entries;
+  }
+  const collections = Array.from(allCollections.entries()).filter(([_colUid, col]) => col.collectionType === colType);
+  const items = collections.map(([colUid]) => allItems.get(colUid));
+  const same = last && (last.entries.collections.length === collections.length) &&
+    collections.every(([colUid, col], i) => (last.entries.collections[i][0] === colUid) && (last.entries.collections[i][1] === col) && (last.entries.items[i] === items[i]));
+  const entries = (same) ? last!.entries : { collections, items };
+  lastEntries.set(colType, { allCollections, allItems, entries });
+  return entries;
+}
+
+// The parsed items of the entries, for all of the screens that show them: the first one to need
+// them parses them (one item after the other, so the screen stays responsive), the others get the
+// same list.
+const loadedItems = new WeakMap<TypeEntries, Promise<PimType[]>>();
+const loadedItemsNow = new WeakMap<TypeEntries, PimType[]>();
+
+export function loadPimItems<T extends PimType>(etebase: Etebase.Account, entries: TypeEntries, parse: (content: string) => T): Promise<T[]> {
+  let ret = loadedItems.get(entries);
+  if (!ret) {
+    ret = (async () => {
       const colMgr = etebase.getCollectionManager();
       const items: T[] = [];
-      for (const [colUid, cachedCol] of cachedCollections.entries()) {
-        if (cachedCol.collectionType !== colType) {
-          continue;
-        }
-        for (const [itemUid, cachedItem] of (cachedItems.get(colUid)?.entries() ?? [])) {
+      for (let i = 0; i < entries.collections.length; i++) {
+        const [colUid, cachedCol] = entries.collections[i];
+        for (const [itemUid, cachedItem] of (entries.items[i]?.entries() ?? [])) {
           if (cachedItem.isDeleted) {
             continue;
           }
@@ -103,27 +125,35 @@ export function usePimItems<T extends PimType>(etebase: Etebase.Account | null |
           }
         }
       }
+      loadedItemsNow.set(entries, items);
+      return items;
+    })();
+    loadedItems.set(entries, ret);
+  }
+  return ret as Promise<T[]>;
+}
+
+// All of the (not deleted) items of the collections of a type, parsed. Undefined while loading.
+export function usePimItems<T extends PimType>(etebase: Etebase.Account | null | undefined, colType: string, parse: (content: string) => T): T[] | undefined {
+  const entries = useSelector((state: StoreState) => entriesOfType(state, colType));
+  const [ret, setRet] = React.useState(() => loadedItemsNow.get(entries) as T[] | undefined);
+
+  React.useEffect(() => {
+    if (!etebase) {
+      return undefined;
+    }
+    let cancel = false;
+    loadPimItems(etebase, entries, parse).then((items) => {
       if (!cancel) {
         setRet(items);
       }
-    })();
+    });
     return () => {
       cancel = true;
     };
-  }, [etebase, cachedCollections, cachedItems, colType]);
+  }, [etebase, entries]);
 
   return ret;
-}
-
-function loadCollection(etebase: Etebase.Account, colUid: string) {
-  const state = store.getState() as unknown as StoreState;
-  const cachedCol = state.allCache.collections.get(colUid);
-  if (!cachedCol) {
-    throw new Error("The collection is not available anymore");
-  }
-  const colMgr = etebase.getCollectionManager();
-  const col = colMgr.cacheLoad(cachedCol.cache);
-  return { col, itemMgr: colMgr.getItemManager(col), state };
 }
 
 // Saves a new item (when it has no itemUid yet) or a changed one to a collection. Moving an item to
@@ -139,11 +169,11 @@ export async function savePimItem(etebase: Etebase.Account, colUid: string, item
     item.itemUid = undefined;
   }
 
-  const { col, itemMgr, state } = loadCollection(etebase, colUid);
-  const cachedItem = (item.itemUid) ? state.allCache.items.get(colUid)?.get(item.itemUid) : undefined;
+  const { col, itemMgr } = loadCollection(etebase, colUid);
+  const existing = (item.itemUid) ? findItem(etebase, colUid, item.itemUid)?.item : undefined;
   let eteItem: Etebase.Item;
-  if (cachedItem) {
-    eteItem = itemMgr.cacheLoad(cachedItem.cache);
+  if (existing) {
+    eteItem = existing;
     await eteItem.setContent(content);
     eteItem.setMeta({ ...eteItem.getMeta(), mtime });
   } else {
@@ -155,20 +185,12 @@ export async function savePimItem(etebase: Etebase.Account, colUid: string, item
 }
 
 export async function deletePimItem(etebase: Etebase.Account, item: PimType) {
-  const { col, itemMgr, state } = loadCollection(etebase, item.collectionUid!);
-  const cachedItem = state.allCache.items.get(item.collectionUid!)?.get(item.itemUid!);
-  if (!cachedItem) {
+  const loaded = findItem(etebase, item.collectionUid!, item.itemUid!);
+  if (!loaded) {
     return;
   }
-  const eteItem = itemMgr.cacheLoad(cachedItem.cache);
+  const { col, itemMgr, item: eteItem } = loaded;
   eteItem.setMeta({ ...eteItem.getMeta(), mtime: (new Date()).getTime() });
   eteItem.delete(true);
   await saveItemsLocally(etebase, col, itemMgr, [eteItem]);
-}
-
-export async function createPimCollection(etebase: Etebase.Account, colType: string, name: string, color?: string) {
-  const colMgr = etebase.getCollectionManager();
-  const col = await colMgr.create(colType, { name, mtime: (new Date()).getTime(), color }, "");
-  await saveCollectionLocally(etebase, colMgr, col, true);
-  return col.uid;
 }

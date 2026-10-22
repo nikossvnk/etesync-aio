@@ -9,14 +9,15 @@ import * as Etebase from "etebase";
 import { useSyncGate } from "../SyncGate";
 import { useCredentials } from "../credentials";
 import { CachedItem, StoreState } from "../store";
-import { defaultColor } from "../helpers";
-import { isPinned, untitled } from "../notes";
+import { isPinned, setPinned, untitled } from "../notes";
 import { setSettings } from "../store/actions";
 
 import NotFound from "../widgets/NotFound";
 import Link from "../widgets/Link";
+import AppbarButton from "../widgets/AppbarButton";
 import GroupedRow from "../widgets/GroupedRow";
 import { fonts, useTheme } from "../theme";
+import { defaultColor } from "../constants";
 
 function sortMtime(aIn: CachedItem, bIn: CachedItem) {
   const a = aIn.meta.mtime!;
@@ -340,23 +341,47 @@ interface PropsType {
   onPressNote?: (note: string) => boolean;
 }
 
-export default function NoteList(props: PropsType) {
-  const cacheCollections = useSelector((state: StoreState) => state.cache.collections);
-  const cacheItems = useSelector((state: StoreState) => state.cache.items);
-  const syncGate = useSyncGate();
-  const theme = useTheme();
+// The buttons for the notes that are selected: pinning them (or unpinning them, when they're all
+// pinned) and deleting them (which asks first, so it's only told about)
+export function SelectionButtons(props: { selection: Set<string>, allPinned: boolean, onPinned: () => void, onDelete: () => void }) {
   const etebase = useCredentials();
+  return (
+    <>
+      <AppbarButton
+        icon={(props.allPinned) ? "pin-off-outline" : "pin-outline"}
+        title={(props.allPinned) ? "Unpin selected" : "Pin selected"}
+        onPress={async () => {
+          await setPinned(etebase!, props.selection, !props.allPinned);
+          props.onPinned();
+        }}
+      />
+      <AppbarButton icon="delete" title="Delete selected" onPress={props.onDelete} />
+    </>
+  );
+}
 
-  // The item managers the cards load their previews with, created as needed
+// The item managers that lists of notes load the previews with, one per notebook, made when one is
+// first needed
+export function useItemManagers() {
+  const etebase = useCredentials();
+  const cacheCollections = useSelector((state: StoreState) => state.cache.collections);
   const itemMgrs = React.useMemo(() => new Map<string, Etebase.ItemManager>(), [etebase, cacheCollections]);
-  function getItemMgr(colUid: string) {
+  return React.useCallback((colUid: string) => {
     const cached = cacheCollections.get(colUid);
     if (!itemMgrs.has(colUid) && etebase && cached) {
       const colMgr = etebase.getCollectionManager();
       itemMgrs.set(colUid, colMgr.getItemManager(colMgr.cacheLoad(cached.cache)));
     }
     return itemMgrs.get(colUid);
-  }
+  }, [itemMgrs]);
+}
+
+export default function NoteList(props: PropsType) {
+  const cacheCollections = useSelector((state: StoreState) => state.cache.collections);
+  const cacheItems = useSelector((state: StoreState) => state.cache.items);
+  const syncGate = useSyncGate();
+  const theme = useTheme();
+  const getItemMgr = useItemManagers();
 
   const { sortBy } = props;
   const colUid = props.colUid || undefined;

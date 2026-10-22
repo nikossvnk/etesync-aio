@@ -2,7 +2,7 @@
 // calendar, a task list and an address book from the wizard; what's on the server shows up in the
 // app (repeating events on every week); and what's made or changed in the app gets to the server.
 // It uses an account of its own (made for each run), so the notes of the other tests are not touched.
-const { launch, session, run, check, config, Etebase, unique } = require("../lib");
+const { launch, session, run, check, config, Etebase, unique, newAccount, waitFor } = require("../lib");
 
 const types = { notes: "etebase.md.note", calendar: "etebase.vevent", tasks: "etebase.vtodo", contacts: "etebase.vcard" };
 
@@ -30,16 +30,7 @@ async function serverState(etebase) {
 
 // Waits until the server has what's checked (the app uploads in the background)
 let lastState;
-async function waitForServer(etebase, fn) {
-  for (let i = 0; i < 20; i++) {
-    lastState = await serverState(etebase);
-    if (fn(lastState)) {
-      return true;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
-}
+const waitForServer = (etebase, fn) => waitFor(async () => fn(lastState = await serverState(etebase)));
 // What the server has, for the details of a failed check
 const serverDetail = (type) => () => lastState.filter((x) => x.type === type).flatMap((x) => x.contents).join("\n---\n");
 
@@ -58,9 +49,7 @@ const usDate = (d) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullY
 
 run(async () => {
   const n = unique();
-  const username = `aio-${n}`;
-  const password = "aio-tester-password";
-  const etebase = await Etebase.Account.signup({ username, email: `${username}@example.invalid` }, password, config.serverUrl);
+  const { username, password, etebase } = await newAccount("aio");
 
   const b = await launch();
   const A = await session(b, "A", { width: 1400, height: 900 });
@@ -69,12 +58,7 @@ run(async () => {
   const sideRow = (label) => sidebar.getByRole("button", { name: label, exact: true });
 
   // Logging in to a new account opens the wizard
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(8000);
+  await A.login({ username, password });
   check("the wizard offers the four collections", await A.has("My Notes, My Calendar, My Tasks, My Contacts"), await A.text());
   await btn(/^finish$/i).click(); await wait(6000);
   check("and creates them on the server", await waitForServer(etebase, (s) => (
@@ -455,12 +439,7 @@ run(async () => {
 
   // Phones: the drawer has them too
   const B = await session(b, "B", { width: 420, height: 800 });
-  await B.p.goto(config.appUrl + "/"); await B.wait(4000);
-  await B.vis('[aria-label="Change the server"]').click(); await B.wait(500);
-  await B.vis('input[aria-label="Username"]').fill(username);
-  await B.vis('input[aria-label="Password"]').fill(password);
-  await B.vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await B.btn(/^log in$/i).click(); await B.wait(10000);
+  await B.login({ username, password }, 10000);
   await B.tab("Tasks"); await B.wait(3000);
   check("on a phone, Tasks from the drawer shows the tasks", await B.has(`Call mom ${n}`), await B.text());
   await B.tab("Contacts"); await B.wait(2000);

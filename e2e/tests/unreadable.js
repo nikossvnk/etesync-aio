@@ -34,13 +34,8 @@ run(async () => {
 
   const b = await launch();
   const A = await session(b, "A", { width: 1400, height: 900 });
-  const { p, vis, btn, wait } = A;
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(9000);
+  const { p, wait } = A;
+  await A.login({ username, password }, 9000);
   const side = (label) => p.locator('[data-testid="sidebar"] >> visible=true').getByRole("button", { name: label, exact: true });
   await side("Calendar").click(); await wait(3000);
   const body = async () => p.innerText("body");

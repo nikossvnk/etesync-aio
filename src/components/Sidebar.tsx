@@ -10,7 +10,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { StoreState } from "../store";
 import { setSettings } from "../store/actions";
-import { defaultColor, serverName } from "../helpers";
+import { serverName } from "../helpers";
 import { cardShadow, fonts, useTheme } from "../theme";
 import { usePendingCount } from "../SyncGate";
 import { useCredentials } from "../credentials";
@@ -203,7 +203,7 @@ function Account() {
 type Section = "notes" | "bookmarks" | "calendar" | "tasks" | "contacts" | "settings" | "other";
 
 // Which of the five sections a screen belongs to
-export function sectionOf(screen: string | undefined): Section {
+function sectionOf(screen: string | undefined): Section {
   if (!screen) {
     return "notes";
   } else if (screen === "Bookmarks") {
@@ -456,7 +456,7 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
     .map(([colUid, collection]) => ({
       colUid,
       name: collection.meta.name ?? "",
-      color: collection.meta.color || defaultColor,
+      color: collection.meta.color || C.defaultColor,
       count: cacheItems.get(colUid)?.count((x) => !x.isDeleted) ?? 0,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -590,8 +590,8 @@ export default function Sidebar() {
               count={x.count}
               left={<MaterialCommunityIcons name={x.icon as any} size={18} color={(selected) ? theme.colors.accent : theme.colors.textMuted} style={styles.icon} />}
               right={(x.badge) ? (
-                <View style={styles.badge} accessibilityLabel={`${x.badge} due`}>
-                  <Text style={styles.badgeText}>{x.badge}</Text>
+                <View style={[styles.badge, { backgroundColor: theme.colors.warning }]} accessibilityLabel={`${x.badge} due`}>
+                  <Text style={[styles.badgeText, { color: theme.colors.onWarning }]}>{x.badge}</Text>
                 </View>
               ) : undefined}
             />
@@ -812,13 +812,11 @@ const styles = StyleSheet.create({
     height: 20,
     paddingHorizontal: 6,
     borderRadius: 10,
-    backgroundColor: "#F09A5C",
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 6,
   },
   badgeText: {
-    color: "#1A1206",
     fontSize: 11,
     fontFamily: fonts.semibold,
   },

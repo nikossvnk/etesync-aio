@@ -8,7 +8,7 @@ import { Text } from "react-native-paper";
 import * as C from "../constants";
 import { validateServerUrl } from "../helpers";
 import { useTheme } from "../theme";
-import { AuthField, AuthInput, PasswordField, PrimaryButton, ServerBox } from "./Auth";
+import { AuthField, PasswordField, PrimaryButton, ServerBox, UsernameField } from "./Auth";
 
 interface FormErrors {
   username?: string;
@@ -62,20 +62,7 @@ export default function LoginForm(props: PropsType) {
     <>
       <ServerBox verb="Logging in to" value={server} onChange={setServer} error={errors.server} />
       <View style={{ gap: 16 }}>
-        <AuthField label="Username" error={errors.username}>
-          <AuthInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            autoFocus
-            returnKeyType="next"
-            onSubmitEditing={() => passwordRef.current?.focus()}
-            invalid={!!errors.username}
-            onChangeText={setUsername}
-            accessibilityLabel="Username"
-            value={username}
-          />
-        </AuthField>
+        <UsernameField value={username} onChangeText={setUsername} error={errors.username} onSubmitEditing={() => passwordRef.current?.focus()} />
         <AuthField
           label="Password"
           error={errors.password}

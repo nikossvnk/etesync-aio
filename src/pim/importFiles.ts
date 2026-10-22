@@ -10,8 +10,9 @@ import * as Etebase from "etebase";
 import * as ICAL from "ical.js";
 import * as uuid from "uuid";
 
-import { store, StoreState } from "../store";
+import { store } from "../store";
 import { saveItemsLocally } from "../sync/SyncManager";
+import { loadCollection } from "../cached";
 import { createCollection, Kind, kinds } from "./collections";
 import { BookmarkMetadata, comparableUrl, metaOf, ParsedBookmark, readBookmarksHtml } from "../bookmarks";
 
@@ -216,7 +217,6 @@ function withNewUid(content: string, uid: string) {
 }
 
 export async function runImport(etebase: Etebase.Account, parsed: Parsed, destinations: { [kind in Kind]?: Destination }, duplicates: Duplicates): Promise<KindResult[]> {
-  const colMgr = etebase.getCollectionManager();
   const results: KindResult[] = [];
   for (const kind of Object.keys(destinations) as Kind[]) {
     const destination = destinations[kind]!;
@@ -225,10 +225,8 @@ export async function runImport(etebase: Etebase.Account, parsed: Parsed, destin
       continue;
     }
     const colUid = ("colUid" in destination) ? destination.colUid : await createCollection(etebase, kind, { name: destination.newName });
-    const state = store.getState() as unknown as StoreState;
-    const cachedCol = state.allCache.collections.get(colUid)!;
-    const col = colMgr.cacheLoad(cachedCol.cache);
-    const itemMgr = colMgr.getItemManager(col);
+    const state = store.getState();
+    const { col, itemMgr } = loadCollection(etebase, colUid);
 
     // The items that are there already, by their UID (for notes, their title, for bookmarks, their link)
     const existing = new Map<string, Etebase.Item>();
@@ -250,7 +248,7 @@ export async function runImport(etebase: Etebase.Account, parsed: Parsed, destin
       }
     }
 
-    const result: KindResult = { kind, colUid, name: cachedCol.meta.name ?? "", added: 0, updated: 0, skipped: 0 };
+    const result: KindResult = { kind, colUid, name: col.getMeta().name ?? "", added: 0, updated: 0, skipped: 0 };
     const items: Etebase.Item[] = [];
     const mtime = (new Date()).getTime();
     for (const entry of entries) {

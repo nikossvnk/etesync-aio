@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { BackHandler, StyleSheet, View, Platform } from "react-native";
+import { BackHandler, StyleSheet, View } from "react-native";
 import { FAB, Paragraph, Text, TouchableRipple } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useSelector, useDispatch } from "react-redux";
 
-import { useSyncGate, usePendingCount } from "../SyncGate";
+import { useSyncGate } from "../SyncGate";
 import { StoreState } from "../store";
-import { SyncManager } from "../sync/SyncManager";
-import { performSync, setSettings } from "../store/actions";
+import { setSettings } from "../store/actions";
 import { useCredentials } from "../credentials";
 
-import NoteList from "../components/NoteList";
+import NoteList, { SelectionButtons } from "../components/NoteList";
+import SyncButton, { useAutoSync } from "../components/SyncButton";
 import NotebookFilter from "../components/NotebookFilter";
 import { useSidebarShown } from "../components/Sidebar";
 import Appbar from "../widgets/Appbar";
@@ -22,7 +22,7 @@ import AppbarButton from "../widgets/AppbarButton";
 import { DefaultNavigationProp } from "../RootStackParamList";
 import { fonts, useTheme } from "../theme";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
-import { deleteNotes, isPinned, setPinned } from "../notes";
+import { deleteNotes, isPinned } from "../notes";
 
 interface PropsType {
   active: boolean;
@@ -129,15 +129,7 @@ export default function NoteListScreen(props: PropsType) {
         ),
         headerRight: () => (
           <View style={{ flexDirection: "row" }}>
-            <AppbarButton
-              icon={(allPinned) ? "pin-off-outline" : "pin-outline"}
-              title={(allPinned) ? "Unpin selected" : "Pin selected"}
-              onPress={async () => {
-                await setPinned(etebase!, selection, !allPinned);
-                setSelection(new Set());
-              }}
-            />
-            <AppbarButton icon="delete" title="Delete selected" onPress={() => setDeleteShown(true)} />
+            <SelectionButtons selection={selection} allPinned={allPinned} onPinned={() => setSelection(new Set())} onDelete={() => setDeleteShown(true)} />
           </View>
         ),
       });
@@ -414,10 +406,10 @@ interface RightActionPropsType {
 }
 
 function RightAction(props: RightActionPropsType) {
-  const etebase = useCredentials()!;
   const syncDispatch = useDispatch();
   const isSyncing = useSelector((state: StoreState) => state.syncCount) > 0;
-  const pendingCount = usePendingCount();
+  // (it syncs when the screen is shown)
+  const sync = useAutoSync(!useIsFocused());
   const viewSettings = useSelector((state: StoreState) => state.settings.viewSettings);
   const navigation = useNavigation<DefaultNavigationProp>();
   // The notebook whose notes are listed
@@ -435,43 +427,12 @@ function RightAction(props: RightActionPropsType) {
     }) as any);
   }
 
-  async function refresh() {
-    const syncManager = SyncManager.getManager(etebase!);
-    syncDispatch(performSync(syncManager.sync()) as any); // not awaiting on puprose
-  }
-
-  useFocusEffect(React.useCallback(() => {
-    if (!etebase) {
-      return () => true;
-    }
-
-    refresh();
-
-    if (Platform.OS !== "web") {
-      return () => true;
-    }
-
-    function autoRefresh() {
-      if (navigator.onLine && etebase) {
-        refresh();
-      }
-    }
-
-    const interval = 5 * 60 * 1000;
-    const id = setInterval(autoRefresh, interval);
-    return () => clearInterval(id);
-  }, [etebase]));
 
   // The sort order is a button that switches between the two
   const byName = (viewSettings.sortBy === "name");
   return (
     <View style={{ flexDirection: "row" }}>
-      <AppbarButton
-        icon={(pendingCount > 0) ? "cloud-upload-outline" : "sync"}
-        title={(pendingCount > 0) ? `Sync (${pendingCount} not uploaded yet)` : "Sync"}
-        disabled={isSyncing}
-        onPress={refresh}
-      />
+      <SyncButton onPress={sync} />
       <AppbarButton
         icon={(byName) ? "sort-alphabetical-ascending" : "sort-clock-descending-outline"}
         title={(byName) ? "Sorted by name, sort by modification time" : "Sorted by modification time, sort by name"}

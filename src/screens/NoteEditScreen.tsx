@@ -25,17 +25,19 @@ import { pushMessage, setCacheItem, setSettings, setSyncItem, unsetCacheItem } f
 import { newNotes, openInEditor } from "../newNotes";
 import { isPinned, moveNote, nameFromContent, noteName, setPinned, untitled } from "../notes";
 import { requestSync, saveItemsLocally } from "../sync/SyncManager";
+import { loadCollection } from "../cached";
 import LoadingIndicator from "../widgets/LoadingIndicator";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import NotFound from "../widgets/NotFound";
 import AppbarButton from "../widgets/AppbarButton";
-import { defaultColor, fontFamilies } from "../helpers";
+import { fontFamilies } from "../helpers";
 import Select from "../widgets/Select";
 import { RootStackParamList } from "../RootStackParamList";
 import { useWideLayout } from "../components/WideLayout";
 import FormatBar from "../widgets/FormatBar";
 import { Edit } from "../markdownFormat";
 import { canShare, shareItem } from "../import-export";
+import { defaultColor } from "../constants";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "NoteEdit">;
 
@@ -170,12 +172,10 @@ export default function NoteEditScreen(props: PropsType) {
     const content = contentRef.current;
     const name = noteName(titleRef.current, content);
 
-    const colMgr = etebase.getCollectionManager();
-    const col = colMgr.cacheLoad(cacheCollections.get(colUid)!.cache);
-    const itemMgr = colMgr.getItemManager(col);
+    const { col, itemMgr } = loadCollection(etebase, colUid);
 
     for (;;) {
-      const current = (store.getState() as unknown as StoreState).cache.items.get(colUid)?.get(itemUid);
+      const current = store.getState().cache.items.get(colUid)?.get(itemUid);
       if (!current) {
         return;
       }
@@ -188,7 +188,7 @@ export default function NoteEditScreen(props: PropsType) {
       await item.setContent(content);
 
       // Start over if the cached note was replaced (e.g. by a sync) while we were working on it
-      const latest = (store.getState() as unknown as StoreState).cache.items.get(colUid)?.get(itemUid);
+      const latest = store.getState().cache.items.get(colUid)?.get(itemUid);
       if (latest === current) {
         await dispatch(setCacheItem(col, itemMgr, item));
         syncDispatch(setSyncItem(colUid, itemUid) as any);
@@ -219,9 +219,7 @@ export default function NoteEditScreen(props: PropsType) {
 
     let cancelled = false;
     (async () => {
-      const colMgr = etebase.getCollectionManager();
-      const col = colMgr.cacheLoad(cacheCollections.get(colUid)!.cache);
-      const itemMgr = colMgr.getItemManager(col);
+      const { itemMgr } = loadCollection(etebase, colUid);
       const item = itemMgr.cacheLoad(cacheItem.cache);
       const content = await item.getContent(Etebase.OutputFormat.String);
       if (cancelled || ((loadedKeyRef.current === key) && dirtyRef.current)) {
@@ -274,7 +272,7 @@ export default function NoteEditScreen(props: PropsType) {
     if (dirtyRef.current) {
       await saveLocally();
     }
-    const state = store.getState() as unknown as StoreState;
+    const state = store.getState();
     const current = state.cache.items.get(colUid)?.get(itemUid);
     const from = state.cache.collections.get(colUid);
     const to = state.cache.collections.get(toUid);
@@ -324,9 +322,7 @@ export default function NoteEditScreen(props: PropsType) {
       syncDispatch(unsetCacheItem(colUid, itemUid) as any);
     } else if (etebase && cacheItem) {
       // It got content that was removed again, and may already be on the server, so delete it there too
-      const colMgr = etebase.getCollectionManager();
-      const col = colMgr.cacheLoad(cacheCollections.get(colUid)!.cache);
-      const itemMgr = colMgr.getItemManager(col);
+      const { col, itemMgr } = loadCollection(etebase, colUid);
       const item = itemMgr.cacheLoad(cacheItem.cache);
       item.delete(true);
       saveItemsLocally(etebase, col, itemMgr, [item]);
@@ -373,9 +369,7 @@ export default function NoteEditScreen(props: PropsType) {
 
   function onShare() {
     (async () => {
-      const colMgr = etebase.getCollectionManager();
-      const col = colMgr.cacheLoad(cacheCollections.get(colUid)!.cache);
-      const itemMgr = colMgr.getItemManager(col);
+      const { itemMgr } = loadCollection(etebase, colUid);
       const item = itemMgr.cacheLoad(cacheItem!.cache);
       await shareItem(item);
     })();
@@ -473,9 +467,7 @@ export default function NoteEditScreen(props: PropsType) {
         title="Delete Note"
         visible={noteDeleteDialogShow}
         onOk={async () => {
-          const colMgr = etebase.getCollectionManager();
-          const col = colMgr.cacheLoad(cacheCollections.get(colUid)!.cache);
-          const itemMgr = colMgr.getItemManager(col);
+          const { col, itemMgr } = loadCollection(etebase, colUid);
           const item = itemMgr.cacheLoad(cacheItem.cache);
 
           const meta = item.getMeta();

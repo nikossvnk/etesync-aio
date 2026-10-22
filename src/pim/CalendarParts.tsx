@@ -63,7 +63,7 @@ function Place(props: { location: string }) {
 }
 
 // An event as a card, in the list of the events of a day
-export function EventCard(props: { x: Occurrence, fmt: DateFormats, onPress: (x: Occurrence) => void, day?: Date }) {
+function EventCard(props: { x: Occurrence, fmt: DateFormats, onPress: (x: Occurrence) => void, day?: Date }) {
   const theme = useTheme();
   const { x, fmt } = props;
   return (
@@ -585,7 +585,7 @@ export function SpanBar(props: { bar: Bar, height: number, compact?: boolean, se
 }
 
 // The days of an event that covers several, e.g. "Thu 8 – Sun 11 October"
-export function formatDays(x: Occurrence, fmt: DateFormats) {
+function formatDays(x: Occurrence, fmt: DateFormats) {
   const last = new Date(x.end.getTime() - 1);
   if (dayCount(x) === 1) {
     return fmt.day.format(x.start);

@@ -201,21 +201,31 @@ const reducers = combineReducers<any>({
 
 // The notes part of the app sees only the notebooks, so "cache" is a view of the notebooks in the
 // cache of everything ("allCache"), which is what is synced and saved. The view is only made again
-// when the cache changes.
+// when the cache changes, and its maps stay the same objects while no notebook or note changed (so
+// the notes screens don't draw again when e.g. an event is saved).
 let lastAllCache: any;
 let lastNotesCache: any;
-function notesView(allCache: any) {
+export function notesView(allCache: any) {
   if (allCache === lastAllCache) {
     return lastNotesCache;
   }
   const notebooks = (allCache.collections as CachedCollectionsData).filter((x) => x.collectionType === C.colType);
+  const items = (allCache.items as CachedItemsData).filter((_items, colUid) => notebooks.has(colUid));
+  const last = lastNotesCache;
   lastAllCache = allCache;
-  lastNotesCache = {
-    ...allCache,
-    collections: notebooks,
-    items: (allCache.items as CachedItemsData).filter((_items, colUid) => notebooks.has(colUid)),
-  };
+  const collections = (last && sameEntries(last.collections, notebooks)) ? last.collections : notebooks;
+  const notes = (last && sameEntries(last.items, items)) ? last.items : items;
+  const others = Object.keys(allCache).filter((key) => (key !== "collections") && (key !== "items"));
+  if (last && (collections === last.collections) && (notes === last.items) && others.every((key) => allCache[key] === last[key])) {
+    return last;
+  }
+  lastNotesCache = { ...allCache, collections, items: notes };
   return lastNotesCache;
+}
+
+// Whether two maps have the same keys, with the same objects
+function sameEntries(a: ImmutableMap<string, unknown>, b: ImmutableMap<string, unknown>) {
+  return (a.size === b.size) && a.every((value, key) => b.get(key) === value);
 }
 
 let lastState: any;

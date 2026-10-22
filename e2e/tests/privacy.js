@@ -63,12 +63,7 @@ run(async () => {
     }
   });
 
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(8000);
+  await A.login({ username, password });
   await btn(/^finish$/i).click(); await wait(6000);
   const sidebar = p.locator('[data-testid="sidebar"] >> visible=true');
   const side = (label) => sidebar.getByRole("button", { name: label, exact: true });

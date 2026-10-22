@@ -7,6 +7,7 @@ import { asyncDispatch, store } from "./store";
 import { CachedCollection, CachedItem } from "./store/reducers";
 import { setCacheItem, unsetCacheItem, unsetSyncItem } from "./store/actions";
 import { saveItemsLocally } from "./sync/SyncManager";
+import { findCollection } from "./cached";
 import { newNotes } from "./newNotes";
 import { NoteMetadata } from "./helpers";
 
@@ -44,7 +45,7 @@ export async function moveNote(etebase: Etebase.Account, from: CachedCollection,
   const newItem = await newItemMgr.create(meta, content);
 
   // Whether it never reached the server, and isn't being uploaded right now (which may make it reach it after all)
-  const state = store.getState() as any;
+  const state = store.getState();
   const neverUploaded = (oldItem.encryptedItem.lastEtag === null) && (state.syncCount === 0);
   if (neverUploaded) {
     if (queued) {
@@ -69,40 +70,46 @@ export async function moveNote(etebase: Etebase.Account, from: CachedCollection,
   return newItem.uid;
 }
 
-// Deletes notes, given as "colUid/itemUid", the way deleting one in its screen does: they're marked
-// as deleted on the device, and the deletion is uploaded
-export async function deleteNotes(etebase: Etebase.Account, notes: Iterable<string>) {
-  const state = store.getState() as any;
-  const colMgr = etebase.getCollectionManager();
+// Changes notes, given as "colUid/itemUid", and saves the ones it changed (the change returns whether
+// it changed one), one notebook at a time. Deleted notes are left out.
+async function changeNotes(etebase: Etebase.Account, notes: Iterable<string>, change: (item: Etebase.Item, cached: CachedItem) => boolean) {
+  const state = store.getState();
   const byNotebook = new Map<string, string[]>();
   for (const note of notes) {
     const [colUid, itemUid] = note.split("/");
     byNotebook.set(colUid, [...(byNotebook.get(colUid) ?? []), itemUid]);
   }
   for (const [colUid, itemUids] of byNotebook) {
-    const cachedCol: CachedCollection | undefined = state.cache.collections.get(colUid);
-    if (!cachedCol) {
+    const loaded = findCollection(etebase, colUid);
+    if (!loaded) {
       continue;
     }
-    const col = colMgr.cacheLoad(cachedCol.cache);
-    const itemMgr = colMgr.getItemManager(col);
+    const { col, itemMgr } = loaded;
     const items: Etebase.Item[] = [];
     for (const itemUid of itemUids) {
-      const cachedItem: CachedItem | undefined = state.cache.items.get(colUid)?.get(itemUid);
+      const cachedItem = state.cache.items.get(colUid)?.get(itemUid);
       if (!cachedItem || cachedItem.isDeleted) {
         continue;
       }
       const item = itemMgr.cacheLoad(cachedItem.cache);
-      const meta = item.getMeta();
-      meta.mtime = (new Date()).getTime();
-      item.setMeta(meta);
-      item.delete(true);
-      items.push(item);
+      if (change(item, cachedItem)) {
+        items.push(item);
+      }
     }
     if (items.length > 0) {
       await saveItemsLocally(etebase, col, itemMgr, items);
     }
   }
+}
+
+// Deletes notes, given as "colUid/itemUid", the way deleting one in its screen does: they're marked
+// as deleted on the device, and the deletion is uploaded
+export async function deleteNotes(etebase: Etebase.Account, notes: Iterable<string>) {
+  await changeNotes(etebase, notes, (item) => {
+    item.setMeta({ ...item.getMeta(), mtime: (new Date()).getTime() });
+    item.delete(true);
+    return true;
+  });
 }
 
 export function isPinned(item: CachedItem) {
@@ -113,38 +120,17 @@ export function isPinned(item: CachedItem) {
 // so they keep their place among the notes when they're unpinned. The same as in EteSync Notes, which
 // opens the same notes: "pinned: true" in the meta, and no "pinned" at all when unpinned.
 export async function setPinned(etebase: Etebase.Account, notes: Iterable<string>, pinned: boolean) {
-  const state = store.getState() as any;
-  const colMgr = etebase.getCollectionManager();
-  const byNotebook = new Map<string, string[]>();
-  for (const note of notes) {
-    const [colUid, itemUid] = note.split("/");
-    byNotebook.set(colUid, [...(byNotebook.get(colUid) ?? []), itemUid]);
-  }
-  for (const [colUid, itemUids] of byNotebook) {
-    const cachedCol: CachedCollection | undefined = state.cache.collections.get(colUid);
-    if (!cachedCol) {
-      continue;
+  await changeNotes(etebase, notes, (item, cached) => {
+    if (isPinned(cached) === pinned) {
+      return false;
     }
-    const col = colMgr.cacheLoad(cachedCol.cache);
-    const itemMgr = colMgr.getItemManager(col);
-    const items: Etebase.Item[] = [];
-    for (const itemUid of itemUids) {
-      const cachedItem: CachedItem | undefined = state.cache.items.get(colUid)?.get(itemUid);
-      if (!cachedItem || cachedItem.isDeleted || (isPinned(cachedItem) === pinned)) {
-        continue;
-      }
-      const item = itemMgr.cacheLoad(cachedItem.cache);
-      const meta = item.getMeta<{ pinned?: boolean }>();
-      if (pinned) {
-        meta.pinned = true;
-      } else {
-        delete meta.pinned;
-      }
-      item.setMeta(meta);
-      items.push(item);
+    const meta = item.getMeta<{ pinned?: boolean }>();
+    if (pinned) {
+      meta.pinned = true;
+    } else {
+      delete meta.pinned;
     }
-    if (items.length > 0) {
-      await saveItemsLocally(etebase, col, itemMgr, items);
-    }
-  }
+    item.setMeta(meta);
+    return true;
+  });
 }

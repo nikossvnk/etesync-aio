@@ -7,9 +7,7 @@ export type RootStackParamList = {
   Notebooks: undefined;
   Login: undefined;
   Signup: undefined;
-  CollectionCreate: undefined;
   Collection: { colUid: string };
-  CollectionEdit: { colUid: string };
   CollectionChangelog: { colUid: string };
   CollectionMembers: { colUid: string };
   NoteCreate: {

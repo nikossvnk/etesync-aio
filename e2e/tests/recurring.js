@@ -3,7 +3,7 @@
 // on its own ("Only this time"), or all of them ("All times"). What's done is checked on the server,
 // in the form other calendars read: RRULE, EXDATE, and more VEVENTs with a RECURRENCE-ID.
 // It uses an account of its own (made for each run), in the time zone of Berlin (the event's).
-const { launch, session, run, check, config, Etebase, unique } = require("../lib");
+const { launch, session, run, check, Etebase, unique, newAccount, waitFor } = require("../lib");
 
 const types = { notes: "etebase.md.note", calendar: "etebase.vevent", tasks: "etebase.vtodo", contacts: "etebase.vcard" };
 
@@ -32,16 +32,7 @@ async function components(etebase, uid) {
 
 // Waits until the server has what's checked (the app uploads in the background)
 let last;
-async function waitForEvent(etebase, uid, fn) {
-  for (let i = 0; i < 20; i++) {
-    last = await components(etebase, uid);
-    if (fn(last)) {
-      return true;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
-}
+const waitForEvent = (etebase, uid, fn) => waitFor(async () => fn(last = await components(etebase, uid)));
 const detail = () => JSON.stringify(last, null, 1);
 
 const main = (comps) => (comps ?? []).filter((x) => !x.some((l) => l.startsWith("RECURRENCE-ID")));
@@ -61,9 +52,7 @@ const icalDate = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDa
 
 run(async () => {
   const n = unique();
-  const username = `aio-rec-${n}`;
-  const password = "aio-tester-password";
-  const etebase = await Etebase.Account.signup({ username, email: `${username}@example.invalid` }, password, config.serverUrl);
+  const { username, password, etebase } = await newAccount("aio-rec");
 
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 }, { timezoneId: "Europe/Berlin" });
@@ -74,12 +63,7 @@ run(async () => {
   const block = (title) => grid.getByRole("button", { name: `Event ${title}`, exact: true });
   const choice = p.locator('[data-testid="repeat-choice"] >> visible=true');
 
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(8000);
+  await A.login({ username, password });
   await btn(/^finish$/i).click(); await wait(6000);
 
   // A standup every day for ten days at 9:00 in Berlin, made by another app: the time of the second

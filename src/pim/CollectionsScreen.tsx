@@ -9,7 +9,7 @@ import * as React from "react";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Paragraph, Text, TouchableRipple } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { RouteProp, useNavigation } from "@react-navigation/native";
+import { NavigationProp, RouteProp, StackActions, useNavigation } from "@react-navigation/native";
 import { useDispatch } from "react-redux";
 import * as Etebase from "etebase";
 
@@ -103,7 +103,7 @@ export function CollectionMenu(props: { info: CollectionInfo, onEdit?: () => voi
 }
 
 // Deleting a collection (or leaving one that was shared with you), after saying what that does
-export function DeleteDialog(props: { info: CollectionInfo, visible: boolean, members?: number, onDone: (deleted: boolean) => void }) {
+function DeleteDialog(props: { info: CollectionInfo, visible: boolean, members?: number, onDone: (deleted: boolean) => void }) {
   const etebase = useCredentials()!;
   const dispatch = useDispatch();
   const { info } = props;
@@ -193,6 +193,18 @@ function MemberRow(props: { member: Member, you: boolean, onAccess: (level: Eteb
 }
 
 // The chosen collection: its details, who has access to it, and deleting it
+// After a collection was deleted, the screens about it that this one was opened from (e.g. a
+// notebook's notes and its page) are left too: back to the screen before the first of them
+function leaveDeleted(navigation: NavigationProp<any>, colUid: string) {
+  const state = navigation.getState();
+  const first = state.routes.findIndex((x) => (x.name !== "Collections") && ((x.params as { colUid?: string } | undefined)?.colUid === colUid));
+  if (first > 0) {
+    navigation.dispatch(StackActions.pop(state.routes.length - first));
+  } else if (first === 0) {
+    navigation.dispatch(StackActions.replace("Home"));
+  }
+}
+
 function CollectionPanel(props: { info: CollectionInfo, members?: Member[], onMembersChanged: () => void, onClose?: () => void, shareFirst?: boolean }) {
   const theme = useTheme();
   const etebase = useCredentials()!;
@@ -336,6 +348,7 @@ function CollectionPanel(props: { info: CollectionInfo, members?: Member[], onMe
         setDeleting(false);
         if (deleted) {
           props.onClose?.();
+          leaveDeleted(navigation, info.colUid);
         }
       }} />
       {inviteKey && (

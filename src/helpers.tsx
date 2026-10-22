@@ -9,8 +9,6 @@ import { logger } from "./logging";
 import * as C from "./constants";
 import { fonts } from "./theme";
 
-export const defaultColor = "#8BC34A";
-
 export interface NoteMetadata extends Etebase.ItemMetadata {
   name: string;
   mtime: number;
@@ -27,10 +25,6 @@ export function* arrayToChunkIterator<T>(arr: T[], size: number) {
 
 export function isPromise(x: any): x is Promise<any> {
   return x && typeof x.then === "function";
-}
-
-export function isDefined<T>(x: T | undefined): x is T {
-  return x !== undefined;
 }
 
 export function startTask<T = any>(func: () => Promise<T> | T, delay = 0): Promise<T> {
@@ -126,11 +120,12 @@ export function useAppStateCb(cb: (foreground: boolean) => void) {
   const [appState, setAppState] = React.useState(state.current);
 
   function onChange(newState: AppStateStatus) {
-    console.log(state.current, newState);
-    if (newState === "active") {
+    const wasActive = state.current === "active";
+    state.current = newState;
+    if ((newState === "active") && !wasActive) {
       logger.debug("App switched to foreground");
       cb(true);
-    } else if (state.current === "active") {
+    } else if ((newState !== "active") && wasActive) {
       logger.debug("App switched to background");
       cb(false);
     }

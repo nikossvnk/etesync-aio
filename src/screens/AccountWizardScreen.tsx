@@ -4,15 +4,16 @@
 import * as React from "react";
 import * as Etebase from "etebase";
 import { View } from "react-native";
-import { Button, Paragraph, Headline } from "react-native-paper";
+import { Button, Paragraph } from "react-native-paper";
 
 import LoadingIndicator from "../widgets/LoadingIndicator";
 import Container from "../widgets/Container";
+import { Headline } from "../widgets/Typography";
 import Wizard, { WizardNavigationBar, PagePropsType } from "../widgets/Wizard";
 
 import { SyncManager } from "../sync/SyncManager";
 
-import { store, StoreState } from "../store";
+import { store } from "../store";
 import { useCredentials } from "../credentials";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -32,7 +33,7 @@ const defaultCollections = [
 ];
 
 function missingDefaultCollections() {
-  const cached = (store.getState() as unknown as StoreState).allCache.collections;
+  const cached = store.getState().allCache.collections;
   return defaultCollections.filter(([type]) => !cached.some((x) => x.collectionType === type));
 }
 
@@ -40,7 +41,7 @@ function missingDefaultCollections() {
 // of the others are missing. Accounts that have one already are not asked about the others again,
 // they can be created on their own screens.
 function needsWizard() {
-  const cached = (store.getState() as unknown as StoreState).allCache.collections;
+  const cached = store.getState().allCache.collections;
   return !cached.some((x) => x.collectionType === C.colType);
 }
 

@@ -10,7 +10,7 @@ import { CachedItem } from "../store/reducers";
 
 // A name that can be used for a file on any system: without the characters some of them don't allow,
 // and not too long
-export function fileName(name: string) {
+function fileName(name: string) {
   const ret = name
     // eslint-disable-next-line no-control-regex
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")

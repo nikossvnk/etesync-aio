@@ -1,6 +1,6 @@
 // A note's title and notebook are changed in the note itself, above its content: the notebook (and
 // the date) and under it the title. New notes open there right away.
-const { launch, session, run, check, api, unique, config, Etebase } = require("../lib");
+const { launch, session, run, check, api, unique, Etebase } = require("../lib");
 
 // The notes on the server, by notebook: { notebook: { name: content } }, without the deleted ones
 async function serverNotes(notebooks) {

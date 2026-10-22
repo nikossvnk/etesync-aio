@@ -7,7 +7,7 @@
 
 import * as Etebase from "etebase";
 
-import { store, StoreState } from "./store";
+import { loadItem } from "./cached";
 import { saveItemsLocally } from "./sync/SyncManager";
 
 export interface Version {
@@ -21,22 +21,9 @@ export interface Version {
   deleted: boolean;
 }
 
-function load(etebase: Etebase.Account, colUid: string, itemUid: string) {
-  const state = store.getState() as unknown as StoreState;
-  const cachedCol = state.allCache.collections.get(colUid);
-  const cachedItem = state.allCache.items.get(colUid)?.get(itemUid);
-  if (!cachedCol || !cachedItem) {
-    throw new Error("The item is not available anymore");
-  }
-  const colMgr = etebase.getCollectionManager();
-  const col = colMgr.cacheLoad(cachedCol.cache);
-  const itemMgr = colMgr.getItemManager(col);
-  return { col, itemMgr, item: itemMgr.cacheLoad(cachedItem.cache) };
-}
-
 // The versions of an item, newest first (the first is the one the server has now)
 export async function loadVersions(etebase: Etebase.Account, colUid: string, itemUid: string): Promise<Version[]> {
-  const { itemMgr, item } = load(etebase, colUid, itemUid);
+  const { itemMgr, item } = loadItem(etebase, colUid, itemUid);
   const ret: Version[] = [];
   let iterator: string | null = null;
   let done = false;
@@ -69,7 +56,7 @@ export function isOffline(e: unknown) {
 // history), like a change made here, so it's also pushed by the sync. The item keeps what its meta
 // has that isn't about the content (e.g. whether a note is pinned); a note gets its title back.
 export async function restoreVersion(etebase: Etebase.Account, colUid: string, itemUid: string, version: Version, withName: boolean) {
-  const { col, itemMgr, item } = load(etebase, colUid, itemUid);
+  const { col, itemMgr, item } = loadItem(etebase, colUid, itemUid);
   await item.setContent(version.content);
   item.setMeta({ ...item.getMeta(), ...((withName) ? { name: version.name } : {}), mtime: (new Date()).getTime() });
   await saveItemsLocally(etebase, col, itemMgr, [item]);

@@ -1,26 +1,24 @@
 import * as React from "react";
-import { StyleSheet, FlatList, Platform, View, BackHandler } from "react-native";
+import { StyleSheet, FlatList, View, BackHandler } from "react-native";
 import { Appbar as PaperAppbar, List, FAB, Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { useDispatch, useSelector } from "react-redux";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 import * as Etebase from "etebase";
 
-import { useSyncGate, usePendingCount } from "../SyncGate";
+import { useSyncGate } from "../SyncGate";
 import { StoreState } from "../store";
-import { SyncManager } from "../sync/SyncManager";
-import { performSync } from "../store/actions";
-import { useCredentials } from "../credentials";
 
 import NoteList from "../components/NoteList";
+import SyncButton, { useAutoSync } from "../components/SyncButton";
+import { useDialogs } from "../pim/Dialogs";
 import Appbar from "../widgets/Appbar";
-import AppbarAction from "../widgets/AppbarAction";
 import AppbarButton from "../widgets/AppbarButton";
 import NotFound from "../widgets/NotFound";
 import GroupedRow from "../widgets/GroupedRow";
-import { defaultColor } from "../helpers";
 import { DefaultNavigationProp } from "../RootStackParamList";
 import { fonts, useTheme } from "../theme";
+import { defaultColor } from "../constants";
 
 interface PropsType {
   colUid?: string;
@@ -41,6 +39,7 @@ export default function NotebookListScreen(props: PropsType) {
     .values()
   ), [cacheCollections]);
   const navigation = useNavigation<DefaultNavigationProp>();
+  const dialogs = useDialogs();
   const syncGate = useSyncGate();
   const theme = useTheme();
 
@@ -153,7 +152,7 @@ export default function NotebookListScreen(props: PropsType) {
         accessibilityLabel="New"
         color={theme.colors.onAccent}
         style={[styles.fab, { backgroundColor: theme.colors.accent }]}
-        onPress={() => navigation.navigate("CollectionCreate")}
+        onPress={() => dialogs.newCollection("notes")}
       />
     </>
   );
@@ -209,48 +208,16 @@ interface RightActionPropsType {
 }
 
 function RightAction(props: RightActionPropsType) {
-  const etebase = useCredentials()!;
-  const syncDispatch = useDispatch();
   const isSyncing = useSelector((state: StoreState) => state.syncCount) > 0;
-  const pendingCount = usePendingCount();
+  // (it syncs when the screen is shown)
+  const sync = useAutoSync(!useIsFocused());
   const navigation = useNavigation<DefaultNavigationProp>();
   const { colUid } = props;
 
-  async function refresh() {
-    const syncManager = SyncManager.getManager(etebase!);
-    syncDispatch(performSync(syncManager.sync()) as any); // not awaiting on puprose
-  }
-
-  useFocusEffect(React.useCallback(() => {
-    if (!etebase) {
-      return () => true;
-    }
-
-    refresh();
-
-    if (Platform.OS !== "web") {
-      return () => true;
-    }
-
-    function autoRefresh() {
-      if (navigator.onLine && etebase) {
-        refresh();
-      }
-    }
-
-    const interval = 5 * 60 * 1000;
-    const id = setInterval(autoRefresh, interval);
-    return () => clearInterval(id);
-  }, [etebase]));
 
   return (
     <View style={{ flexDirection: "row" }}>
-      <AppbarAction
-        icon={(pendingCount > 0) ? "cloud-upload-outline" : "sync"}
-        accessibilityLabel={(pendingCount > 0) ? `Sync (${pendingCount} not uploaded yet)` : "Sync"}
-        disabled={isSyncing}
-        onPress={refresh}
-      />
+      <SyncButton onPress={sync} />
       {colUid && (
         <AppbarButton
           icon="notebook"

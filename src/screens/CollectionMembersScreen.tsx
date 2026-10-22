@@ -13,6 +13,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { useSyncGate } from "../SyncGate";
 import { goUp } from "../navigation";
 import { useCredentials } from "../credentials";
+import { loadCollection } from "../cached";
 import { StoreState } from "../store";
 import { pushMessage } from "../store/actions";
 
@@ -52,8 +53,7 @@ export default function CollectionMembersScreen(props: PropsType) {
   const cacheCollection = collections.get(colUid);
 
   async function fetchMembers() {
-    const colMgr = etebase.getCollectionManager();
-    const col = colMgr.cacheLoad(cacheCollection!.cache);
+    const { colMgr, col } = loadCollection(etebase, colUid);
     if (col.accessLevel !== Etebase.CollectionAccessLevel.Admin) {
       setError(`Only the owner of the collection can view and modify its members.`);
       return;

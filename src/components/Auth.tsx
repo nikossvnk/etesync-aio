@@ -231,6 +231,26 @@ export const AuthInput = React.forwardRef(function AuthInput(props: React.Compon
 });
 
 // A password, which can be shown while it's typed
+// The username field of logging in and signing up, which is where they start
+export function UsernameField(props: { value: string, onChangeText: (value: string) => void, error?: string, onSubmitEditing: () => void }) {
+  return (
+    <AuthField label="Username" error={props.error}>
+      <AuthInput
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="username"
+        autoFocus
+        returnKeyType="next"
+        onSubmitEditing={props.onSubmitEditing}
+        invalid={!!props.error}
+        onChangeText={props.onChangeText}
+        accessibilityLabel="Username"
+        value={props.value}
+      />
+    </AuthField>
+  );
+}
+
 export const PasswordField = React.forwardRef(function PasswordField(props: React.ComponentProps<typeof TextInput> & { invalid?: boolean }, ref: React.Ref<TextInput>) {
   const theme = useTheme();
   const [shown, setShown] = React.useState(false);

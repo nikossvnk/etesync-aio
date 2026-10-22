@@ -38,6 +38,43 @@ exports.run = (fn) => {
 };
 exports.unique = () => String(Date.now() % 1000000);
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+exports.sleep = sleep;
+
+// Whether fn() (which may be async) becomes true within the given seconds, asking every second (e.g.
+// for a change to reach the server)
+exports.waitFor = async (fn, seconds = 20) => {
+  for (let i = 0; i < seconds; i++) {
+    if (await fn()) {
+      return true;
+    }
+    await sleep(1000);
+  }
+  return false;
+};
+
+// An account of the test's own on the test server, logged in through the Etebase client (to prepare
+// data and check the server's side). The app's session logs in with s.login(account).
+exports.newAccount = async (prefix) => {
+  const username = `${prefix}-${exports.unique()}`;
+  const password = "aio-tester-password";
+  const etebase = await Etebase.Account.signup({ username, email: `${username}@example.invalid` }, password, config.serverUrl);
+  return { username, password, etebase };
+};
+
+// The first collection of a type that isn't deleted, once the server has one (e.g. after the wizard
+// of a new account made it)
+exports.collectionOf = async (etebase, type) => {
+  for (let i = 0; i < 20; i++) {
+    const col = (await etebase.getCollectionManager().list([type], { limit: 50 })).data.find((x) => !x.isDeleted);
+    if (col) {
+      return col;
+    }
+    await sleep(1000);
+  }
+  throw new Error(`No collection of ${type}`);
+};
+
 // Direct access to the account through the Etebase client, to prepare data and check the server's side
 exports.api = {
   async login() {
@@ -175,13 +212,14 @@ exports.session = async (browser, tag, viewport = { width: 900, height: 700 }, o
   const wait = (ms) => p.waitForTimeout(ms);
   const s = { tag, ctx, p, vis, btn, text, wait };
 
-  s.login = async () => {
+  // Logs in, to the test account or another one (e.g. from newAccount()), and waits for the first sync
+  s.login = async (account = config, waitMs = 8000) => {
     await p.goto(config.appUrl + "/"); await wait(4000);
     await vis('[aria-label="Change the server"]').click(); await wait(500);
-    await vis('input[aria-label="Username"]').fill(config.username);
-    await vis('input[aria-label="Password"]').fill(config.password);
+    await vis('input[aria-label="Username"]').fill(account.username);
+    await vis('input[aria-label="Password"]').fill(account.password);
     await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-    await btn(/^log in$/i).click(); await wait(8000);
+    await btn(/^log in$/i).click(); await wait(waitMs);
   };
   // Opens a note or a notebook by its name
   // (scrolling the list to it, which only has the rows it scrolled to)
@@ -300,27 +338,32 @@ exports.session = async (browser, tag, viewport = { width: 900, height: 700 }, o
     s.inNotebook = false;
   };
   s.openNotebook = async (name) => { await s.open(name); s.inNotebook = true; };
+  // Opens a notebook in Settings → Collections, where it's edited (from its page: Manage Notebook,
+  // then Edit)
   s.editNotebook = async (name) => {
     await s.home(); await s.openNotebook(name);
     await btn(/^manage notebook$/i).click(); await wait(1500);
-    await btn(/^edit$/i).click(); await wait(1500);
+    await btn(/^edit$/i).click(); await wait(2000);
   };
+  // Makes a notebook with the New collection dialog, from the list of notebooks (which then shows
+  // the new notebook's notes)
   s.createNotebook = async (name) => {
     await s.tab("Notebooks");
-    await btn(/^new$/i).click(); await wait(1500);
-    await p.locator('input[aria-label="Display name (title)"] >> visible=true').last().fill(name);
-    await p.getByRole("button", { name: /^save$/i }).locator("visible=true").last().click(); await wait(3000);
+    await btn(/^new$/i).click(); await wait(1000);
+    const dialog = p.locator('[data-testid="new-collection"] >> visible=true');
+    await dialog.locator('input[aria-label="Name"]').fill(name);
+    await dialog.getByRole("button", { name: "Create notebook", exact: true }).click(); await wait(3000);
   };
   s.renameNotebook = async (from, to) => {
     await s.editNotebook(from);
-    await vis('input[aria-label="Display name (title)"]').fill(to);
-    await btn(/^save$/i).click(); await wait(2500);
+    await vis('input[aria-label="Name"]').fill(to);
+    await btn(/^save changes$/i).click(); await wait(2500);
   };
   s.deleteNotebook = async (name) => {
     await s.editNotebook(name);
-    await btn(/^delete collection$/i).click(); await wait(800);
-    await btn(/^ok$/i).click(); await wait(2500);
-    s.inNotebook = false; // a fresh home screen is shown after deleting
+    await btn(/^delete notebook…$/i).click(); await wait(800);
+    await p.getByRole("button", { name: "Delete", exact: true }).locator("visible=true").last().click(); await wait(2500);
+    s.inNotebook = false; // (back to the screen before the notebook's)
   };
   return s;
 };

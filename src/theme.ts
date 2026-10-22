@@ -41,11 +41,23 @@ export interface Theme extends PaperTheme {
     field: string;
     chipActive: string;
     onChipActive: string;
+    // (e.g. the button of a message, which is on chipActive)
+    onChipActiveAccent: string;
     // Under the chosen row of a list (a tint of the accent) and its outline
     accentTint: string;
     accentRing: string;
     highlight: string;
     success: string;
+    // Something to look at (e.g. a warning, a task of high priority, a weak password) and its milder
+    // and stronger kinds
+    warning: string;
+    onWarning: string;
+    caution: string;
+    danger: string;
+    // What was added, removed and changed (e.g. in the history of an item), also good and bad
+    positive: string;
+    negative: string;
+    changed: string;
   };
 }
 
@@ -85,10 +97,18 @@ export const LightTheme: Theme = {
     field: "#EFEFEA",
     chipActive: "#1B1C1E",
     onChipActive: "#FFFFFF",
+    onChipActiveAccent: "#A8BDF7",
     accentTint: Color(light.accent).alpha(0.09).rgb().string(),
     accentRing: Color(light.accent).alpha(0.22).rgb().string(),
     highlight: "#FFE58A",
     success: "#2F8F6B",
+    warning: "#F09A5C",
+    onWarning: "#1A1206",
+    caution: "#E0B43C",
+    danger: "#F06A6A",
+    positive: "#5CC59B",
+    negative: "#F29B9B",
+    changed: "#F2C94C",
   },
 };
 
@@ -128,10 +148,18 @@ export const DarkTheme: Theme = {
     field: "#26282C",
     chipActive: "#34363C",
     onChipActive: "#ECECEA",
+    onChipActiveAccent: dark.accent,
     accentTint: Color(dark.accent).alpha(0.16).rgb().string(),
     accentRing: Color(dark.accent).alpha(0.35).rgb().string(),
     highlight: "rgba(255,210,80,0.30)",
     success: "#2F8F6B",
+    warning: "#F09A5C",
+    onWarning: "#1A1206",
+    caution: "#E0B43C",
+    danger: "#F06A6A",
+    positive: "#5CC59B",
+    negative: "#F29B9B",
+    changed: "#F2C94C",
   },
 };
 

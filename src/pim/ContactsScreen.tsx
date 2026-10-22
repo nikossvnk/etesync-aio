@@ -94,7 +94,7 @@ function Action(props: { icon: string, label: string, onPress?: () => void, icon
 
 // The details of a contact, and what else is about them: events with them, notes and tasks that
 // mention them
-export function ContactDetails(props: { contact: ContactType }) {
+function ContactDetails(props: { contact: ContactType }) {
   const theme = useTheme();
   const navigation = useNavigation<any>();
   const etebase = useCredentials();

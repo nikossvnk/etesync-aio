@@ -50,7 +50,7 @@ export function setAttendees(comp: ICAL.Component, attendees: AttendeeEntry[]) {
 }
 
 // "Name <email>", an email, or a name
-export function parseAttendee(text: string): AttendeeEntry | undefined {
+function parseAttendee(text: string): AttendeeEntry | undefined {
   const t = text.trim().replace(/,$/, "").trim();
   if (!t) {
     return undefined;

@@ -28,7 +28,6 @@ import {
   domainOf, fetchTitle, findUrl, isValidUrl, normalizeTag, normalizeUrl, restoreBookmark, savedFromLabel, siteLetter, tagBookmarks, updateBookmark,
 } from "../bookmarks";
 import { usePimCollections } from "./data";
-import { swatches } from "./collections";
 import { CollectionPicker, EmptyState } from "./widgets";
 import { Button, DialogInput, Labelled, useDialogs } from "./Dialogs";
 import { DateFormats, useDateFormats } from "./format";
@@ -62,7 +61,7 @@ function compare(sort: Sort) {
 const keyOf = (x: { colUid: string, uid: string }) => `${x.colUid}/${x.uid}`;
 
 // When it was saved: today, yesterday, or the date (with the year when it's another one)
-export function savedLabel(time: number, fmt: DateFormats) {
+function savedLabel(time: number, fmt: DateFormats) {
   const date = new Date(time);
   const now = new Date();
   const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() -
@@ -82,14 +81,14 @@ function editedLabel(time: number, fmt: DateFormats) {
 }
 
 // The tile of a site: its first letter, in a colour of its own
-export function SiteTile(props: { url: string, size?: number }) {
+function SiteTile(props: { url: string, size?: number }) {
   const size = props.size ?? 34;
   const domain = domainOf(props.url);
   let hash = 0;
   for (let i = 0; i < domain.length; i++) {
     hash = (hash * 31 + domain.charCodeAt(i)) | 0;
   }
-  const color = swatches[Math.abs(hash) % swatches.length].color;
+  const color = C.swatches[Math.abs(hash) % C.swatches.length].color;
   return (
     <View aria-hidden style={{ width: size, height: size, borderRadius: size * 0.26, backgroundColor: tint(color, 0.18), alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
       <Text style={{ color, fontFamily: fonts.bold, fontSize: size * 0.42 }}>{siteLetter(props.url)}</Text>
@@ -697,7 +696,7 @@ export default function BookmarksScreen(props: { route: RouteProp<RootStackParam
       setSelected(undefined);
     }
     // The Undo takes the place of the app's messages (e.g. "Bookmark saved"), which would cover it
-    for (let i = (store.getState() as unknown as StoreState).messages.size; i > 0; i--) {
+    for (let i = store.getState().messages.size; i > 0; i--) {
       dispatch(popMessage() as any);
     }
     setDeleted(bookmarks);
@@ -765,7 +764,7 @@ export default function BookmarksScreen(props: { route: RouteProp<RootStackParam
       duration={8000}
       wrapperStyle={{ zIndex: 5 }}
       style={{ backgroundColor: theme.colors.chipActive }}
-      action={{ label: "Undo", onPress: undo, textColor: (theme.dark) ? theme.colors.accent : "#A8BDF7" }}
+      action={{ label: "Undo", onPress: undo, textColor: theme.colors.onChipActiveAccent }}
     >
       <Text style={{ color: theme.colors.onChipActive }}>{(deleted.length > 1) ? `${deleted.length} bookmarks deleted` : "Bookmark deleted"}</Text>
     </Snackbar>

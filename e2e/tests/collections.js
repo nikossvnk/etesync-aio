@@ -2,7 +2,7 @@
 // their ⋯ menu, importing files (choose, review, done) and the Settings → Collections page (editing,
 // sharing with another user, exporting, deleting). What's done is checked on the server.
 // It uses accounts of its own (made for each run).
-const { launch, session, run, check, config, Etebase, unique } = require("../lib");
+const { launch, session, run, check, config, Etebase, unique, waitFor } = require("../lib");
 
 const types = { notes: "etebase.md.note", calendar: "etebase.vevent", tasks: "etebase.vtodo", contacts: "etebase.vcard" };
 
@@ -24,16 +24,6 @@ async function collections(etebase) {
   return ret;
 }
 
-async function waitFor(fn) {
-  for (let i = 0; i < 20; i++) {
-    if (await fn()) {
-      return true;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
-}
-
 run(async () => {
   const n = unique();
   const password = "collections-tester-password";
@@ -50,12 +40,7 @@ run(async () => {
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });
   const { p, vis, btn, wait } = A;
-  await p.goto(config.appUrl + "/"); await wait(4000);
-  await vis('[aria-label="Change the server"]').click(); await wait(500);
-  await vis('input[aria-label="Username"]').fill(username);
-  await vis('input[aria-label="Password"]').fill(password);
-  await vis('input[aria-label="Server URL"]').fill(config.serverUrl);
-  await btn(/^log in$/i).click(); await wait(9000);
+  await A.login({ username, password }, 9000);
   const sidebar = p.locator('[data-testid="sidebar"] >> visible=true');
   const side = (label) => sidebar.getByRole("button", { name: label, exact: true });
   const has = async (text) => (await p.innerText("body")).includes(text);

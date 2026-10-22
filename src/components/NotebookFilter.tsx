@@ -7,8 +7,8 @@ import { Text, TouchableRipple } from "react-native-paper";
 import { useSelector } from "react-redux";
 
 import { StoreState } from "../store";
-import { defaultColor } from "../helpers";
 import { fonts, useTheme } from "../theme";
+import { defaultColor } from "../constants";
 
 interface ChipPropsType {
   label: string;

@@ -12,6 +12,7 @@ import * as C from "./constants";
 import { store } from "./store";
 import { CachedCollectionsData, CachedItem, CachedItemsData } from "./store/reducers";
 import { saveCollectionLocally, saveItemsLocally } from "./sync/SyncManager";
+import { findItem, loadItem } from "./cached";
 
 // A bookmark is an item of a bookmarks collection (C.bookmarkColType). Its title is the item's name,
 // and the rest is in its meta too, so that lists don't have to decrypt the content of each one. The
@@ -32,7 +33,7 @@ export interface BookmarkMetadata extends Etebase.ItemMetadata {
 export type SavedFrom = "android" | "android-share" | "computer" | "import";
 
 // Where this app saves bookmarks from
-export const savedHere: SavedFrom = (Platform.OS === "android") ? "android" : "computer";
+const savedHere: SavedFrom = (Platform.OS === "android") ? "android" : "computer";
 
 // Says where a bookmark was saved, after "Saved 12 Oct": e.g. "from Android (Share)"
 export function savedFromLabel(from: SavedFrom | undefined) {
@@ -65,7 +66,7 @@ export interface BookmarkData {
   tags: string[];
 }
 
-export const defaultCollectionName = "Bookmarks";
+const defaultCollectionName = "Bookmarks";
 
 interface CacheState {
   allCache: {
@@ -75,7 +76,7 @@ interface CacheState {
 }
 
 // The bookmark collections and their items, which only change when the cache does
-export const bookmarkCollectionsSelector = createSelector(
+const bookmarkCollectionsSelector = createSelector(
   (state: CacheState) => state.allCache.collections,
   (collections) => collections.filter((x) => x.collectionType === C.bookmarkColType)
 );
@@ -85,7 +86,7 @@ export const bookmarksSelector = createSelector(
   (cols, items) => items.filter((_x, colUid) => cols.has(colUid))
 );
 
-export function toBookmark(colUid: string, uid: string, cached: CachedItem): Bookmark {
+function toBookmark(colUid: string, uid: string, cached: CachedItem): Bookmark {
   const meta = cached.meta as Partial<BookmarkMetadata>;
   const mtime = meta.mtime ?? 0;
   return {
@@ -194,7 +195,7 @@ export function normalizeTag(tag: string) {
 }
 
 // The bookmark collections, the default one ("Bookmarks") first
-export function bookmarkCollections(state: any) {
+function bookmarkCollections(state: any) {
   return Array.from(bookmarkCollectionsSelector(state).entries())
     .map(([uid, col]) => ({ uid, name: col.meta.name ?? defaultCollectionName }))
     .sort((a, b) => ((a.name === defaultCollectionName) ? -1 : (b.name === defaultCollectionName) ? 1 : a.name.localeCompare(b.name)));
@@ -204,7 +205,7 @@ export function bookmarkCollections(state: any) {
 // (on the device, and uploaded with the next sync) when there's none yet.
 async function getCollection(etebase: Etebase.Account, colUid?: string) {
   const colMgr = etebase.getCollectionManager();
-  const state = store.getState() as any;
+  const state = store.getState();
   const cols = bookmarkCollectionsSelector(state);
   const uid = (colUid && cols.has(colUid)) ? colUid : bookmarkCollections(state)[0]?.uid;
   if (uid) {
@@ -240,33 +241,16 @@ export async function createBookmark(etebase: Etebase.Account, data: BookmarkDat
   return { colUid: col.uid, uid: item.uid };
 }
 
-function loadItem(etebase: Etebase.Account, colUid: string, uid: string) {
-  const state = store.getState() as any;
-  const cachedCol = bookmarkCollectionsSelector(state).get(colUid);
-  const cachedItem: CachedItem | undefined = state.allCache.items.get(colUid)?.get(uid);
-  if (!cachedCol || !cachedItem) {
-    return undefined;
-  }
-  const colMgr = etebase.getCollectionManager();
-  const col = colMgr.cacheLoad(cachedCol.cache);
-  const itemMgr = colMgr.getItemManager(col);
-  return { col, itemMgr, item: itemMgr.cacheLoad(cachedItem.cache) };
-}
-
 // Changes a bookmark. Moving it to another collection makes a new one there (an item can't change
 // its collection), so it returns where it is now.
 export async function updateBookmark(etebase: Etebase.Account, bookmark: Bookmark, data: BookmarkData, colUid?: string) {
   if (colUid && (colUid !== bookmark.colUid)) {
     const ret = await createBookmark(etebase, data, colUid, bookmark.created, bookmark.savedFrom,
-      loadItem(etebase, bookmark.colUid, bookmark.uid)?.item.getMeta());
+      findItem(etebase, bookmark.colUid, bookmark.uid)?.item.getMeta());
     await deleteBookmark(etebase, bookmark);
     return ret;
   }
-  const loaded = loadItem(etebase, bookmark.colUid, bookmark.uid);
-  if (!loaded) {
-    throw new Error("The bookmark is not available anymore");
-  }
-  const { col, itemMgr, item } = loaded;
+  const { col, itemMgr, item } = loadItem(etebase, bookmark.colUid, bookmark.uid);
   // (what else it has, e.g. from a newer version of the app, is kept)
   const meta = { ...item.getMeta(), ...metaOf(data, bookmark.created, bookmark.savedFrom) };
   item.setMeta(meta);
@@ -276,7 +260,7 @@ export async function updateBookmark(etebase: Etebase.Account, bookmark: Bookmar
 }
 
 export async function deleteBookmark(etebase: Etebase.Account, bookmark: Bookmark) {
-  const loaded = loadItem(etebase, bookmark.colUid, bookmark.uid);
+  const loaded = findItem(etebase, bookmark.colUid, bookmark.uid);
   if (!loaded || loaded.item.isDeleted) {
     return;
   }
@@ -292,7 +276,7 @@ export async function deleteBookmark(etebase: Etebase.Account, bookmark: Bookmar
 // the deleted one's meta, while the device still has it).
 export async function restoreBookmark(etebase: Etebase.Account, bookmark: Bookmark) {
   return createBookmark(etebase, bookmark, bookmark.colUid, bookmark.created, bookmark.savedFrom,
-    loadItem(etebase, bookmark.colUid, bookmark.uid)?.item.getMeta());
+    findItem(etebase, bookmark.colUid, bookmark.uid)?.item.getMeta());
 }
 
 // Adds tags to several bookmarks at once (the ones that have them already stay as they are)
@@ -343,7 +327,7 @@ export async function fetchTitle(url: string) {
 }
 
 // The title of a page: its og:title, or else its <title>
-export function titleOfHtml(html: string) {
+function titleOfHtml(html: string) {
   const og = /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i.exec(html) ??
     /<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:title["']/i.exec(html);
   const title = og?.[1] ?? /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1];

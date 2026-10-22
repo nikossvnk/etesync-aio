@@ -19,6 +19,8 @@ declare module "ical.js" {
 
     public getFirstSubcomponent(name?: string): Component | null;
     public getAllSubcomponents(name?: string): Component[];
+    public removeSubcomponent(component: Component | string): boolean;
+    public parent: Component | null;
     public hasProperty(name: string): boolean;
 
     public getFirstPropertyValue<T = any>(name?: string): T;
@@ -49,9 +51,20 @@ declare module "ical.js" {
 
     public component: Component;
 
-    public constructor(component?: Component | null, options?: { strictExceptions: boolean, exepctions: Array<Component | Event> });
+    public constructor(component?: Component | null, options?: { strictExceptions?: boolean, exceptions?: Array<Component | Event> });
+
+    public sequence: number;
+    public get recurrenceId(): Time;
+    public set recurrenceId(value: Time);
+    public get duration(): Duration;
+    // The changed times, by the string of their RECURRENCE-ID
+    public exceptions: { [recurrenceId: string]: Event };
+    public rangeExceptions: any[];
 
     public isRecurring(): boolean;
+    public isRecurrenceException(): boolean;
+    public relateException(obj: Component | Event): void;
+    public getOccurrenceDetails(occurrence: Time): { recurrenceId: Time, item: Event, startDate: Time, endDate: Time };
     public iterator(startTime?: Time): RecurExpansion;
   }
 
@@ -65,9 +78,11 @@ declare module "ical.js" {
     public getValues<T = any>(): T[];
 
     public getParameter(name: string): any;
+    public removeParameter(name: string): void;
     public setParameter(name: string, value: string | string[]): void;
     public setValue(value: string | object): void;
     public setValues(values: (string | object)[]): void;
+    public toICALString(): string;
     public toJSON(): any;
   }
 
@@ -109,7 +124,9 @@ declare module "ical.js" {
       aExtraDays: number, aExtraHours: number, aExtraMinutes: number, aExtraSeconds: number, aTimeopt?: Time): void;
 
     public addDuration(aDuration: Duration): void;
+    public subtractDate(aDate: Time): Duration;
     public subtractDateTz(aDate: Time): Duration;
+    public toString(): string;
 
     public toUnixTime(): number;
     public toJSDate(): Date;
@@ -119,6 +136,7 @@ declare module "ical.js" {
   export class Duration {
     static public fromSeconds(aSeconds: number): Duration;
     public days: number;
+    public toSeconds(): number;
   }
 
   export class RecurExpansion {

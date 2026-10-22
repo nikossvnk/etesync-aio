@@ -27,6 +27,8 @@ import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./da
 import { TimezonePicker, timezoneName } from "./widgets";
 import { useDateFormats } from "./format";
 import { sameDay } from "./occurrences";
+import { RepeatChoiceDialog } from "./Dialogs";
+import { addSeconds, bumpSequence, changeOccurrence, excludeOccurrence, findOccurrence, hasChangedTimes, moveTime, updateSeries } from "./recurrence";
 import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString, toTimeString } from "./widgets";
 
 interface PropsType {
@@ -51,8 +53,24 @@ function zoneOf(time: ICAL.Time): string | undefined {
   return (name === "Z" || name === "UTC") ? "UTC" : name;
 }
 
+// What the form has, to tell what was changed in it
+interface FormValues {
+  title: string;
+  calendar?: string;
+  allDay: boolean;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  timezone: string;
+  location: string;
+  repeat: RepeatKey;
+  attendees: string;
+  description: string;
+}
+
 export default function EventEditScreen(props: PropsType) {
-  const { colUid, itemUid, date, time, attendeeName, attendeeEmail } = props.route.params ?? {};
+  const { colUid, itemUid, occurrence, date, time, attendeeName, attendeeEmail } = props.route.params ?? {};
   // A new event starts at the hour that was chosen in the week or the day view, and lasts an hour
   const startHour = (time) ? parseInt(time) : 9;
   const navigation = useNavigation<any>();
@@ -64,6 +82,9 @@ export default function EventEditScreen(props: PropsType) {
   const fmt = useDateFormats();
   const events = usePimItems(etebase, C.calendarType, EventType.parse);
   const existing = (itemUid) ? events?.find((x) => (x.itemUid === itemUid) && (x.collectionUid === colUid)) : undefined;
+  // A repeating event opened at one of its times (from the calendar) shows that time, which can then be
+  // changed on its own
+  const rid = React.useMemo(() => (existing) ? findOccurrence(existing, occurrence) : undefined, [existing, occurrence]);
 
   const [loaded, setLoaded] = React.useState(false);
   const [title, setTitle] = React.useState(props.route.params?.title ?? "");
@@ -83,6 +104,11 @@ export default function EventEditScreen(props: PropsType) {
   const [error, setError] = React.useState<string>();
   const [deleteShown, setDeleteShown] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  // What the form had when it was opened, and the time of the event it showed
+  const [initial, setInitial] = React.useState<FormValues>();
+  const [shownStart, setShownStart] = React.useState<ICAL.Time>();
+  // The times of a change to one time of a repeating event, while it's asked which times it's for
+  const [choice, setChoice] = React.useState<{ start: ICAL.Time, end: ICAL.Time }>();
 
   // The form starts with what the event has, once it's loaded
   React.useEffect(() => {
@@ -90,37 +116,56 @@ export default function EventEditScreen(props: PropsType) {
       return;
     }
     if (existing) {
+      // The time that was opened (which can have been changed on its own), or the event
+      const details = (rid) ? existing.getOccurrenceDetails(rid) : undefined;
+      const item = details?.item ?? existing;
+      const startTime = details?.startDate ?? existing.startDate;
+      const endTime = details?.endDate ?? existing.endDate ?? startTime;
       // The times as they are in the event's time zone (or on this device, for one without)
-      const zone = (!existing.startDate.isDate) ? zoneOf(existing.startDate) : undefined;
+      const zone = (!startTime.isDate) ? zoneOf(startTime) : undefined;
       const known = !!zone && !!loadZone(zone);
       const wallClock = (time: ICAL.Time) => (known) ?
         new Date(time.year, time.month - 1, time.day, time.hour, time.minute) :
         time.convertToZone(ICAL.Timezone.localTimezone).toJSDate();
-      if (known) {
-        setTimezone(zone!);
-      }
-      const start = wallClock(existing.startDate);
-      let end = wallClock(existing.endDate ?? existing.startDate);
-      if (existing.startDate.isDate) {
+      const start = wallClock(startTime);
+      let end = wallClock(endTime);
+      if (startTime.isDate) {
         // All day events end at the start of the day after their last one
         end = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
       }
-      setTitle(existing.title ?? "");
-      setCalendar(existing.collectionUid);
-      setAllDay(existing.startDate.isDate);
-      setStartDate(toDateString(start));
-      setStartTime(toTimeString(start));
-      setEndDate(toDateString(end));
-      setEndTime(toTimeString(end));
-      setLocation(existing.location ?? "");
-      setRepeat(repeatKeyOf(existing.isRecurring() ? existing.rrule : null));
-      setAttendeesState(attendeesOf(existing.component));
-      setDescription(existing.description ?? "");
+      const values: FormValues = {
+        title: item.summary ?? "",
+        calendar: existing.collectionUid,
+        allDay: startTime.isDate,
+        startDate: toDateString(start),
+        startTime: toTimeString(start),
+        endDate: toDateString(end),
+        endTime: toTimeString(end),
+        timezone: (known) ? zone! : timezone,
+        location: item.location ?? "",
+        repeat: repeatKeyOf(existing.isRecurring() ? existing.rrule : null),
+        attendees: JSON.stringify(attendeesOf(item.component)),
+        description: item.description ?? "",
+      };
+      setTitle(values.title);
+      setCalendar(values.calendar);
+      setAllDay(values.allDay);
+      setStartDate(values.startDate);
+      setStartTime(values.startTime);
+      setEndDate(values.endDate);
+      setEndTime(values.endTime);
+      setTimezone(values.timezone);
+      setLocation(values.location);
+      setRepeat(values.repeat);
+      setAttendeesState(JSON.parse(values.attendees));
+      setDescription(values.description);
+      setInitial(values);
+      setShownStart(startTime);
     } else {
       setCalendar(colUid ?? calendars[0]?.colUid);
     }
     setLoaded(true);
-  }, [events, existing, loaded]);
+  }, [events, existing, rid, loaded]);
 
   React.useEffect(() => {
     navigation.setOptions({
@@ -172,23 +217,75 @@ export default function EventEditScreen(props: PropsType) {
       return;
     }
 
-    const event = existing?.clone() ?? new EventType();
-    if (!existing) {
-      event.uid = uuid.v4();
+    // A change to one time of a repeating event can be for only that time, or for all of them (a
+    // change to how it repeats, or to its calendar, is for all of them)
+    if (existing && rid && existing.isRecurring() && (repeat === initial?.repeat) && (calendar === existing.collectionUid)) {
+      setChoice({ start: icalStart, end: icalEnd });
+      return;
     }
-    event.summary = title;
-    event.startDate = icalStart;
-    event.endDate = icalEnd;
-    event.location = location;
-    event.description = description;
-    applyRepeat(event.component, repeat);
+    await saveEvent(icalStart, icalEnd, "all");
+  }
+
+  async function saveEvent(icalStart: ICAL.Time, icalEnd: ICAL.Time, which: "this" | "all") {
+    setChoice(undefined);
+    // What was changed in the form (all of it, for a new event). Only that is changed in the event,
+    // so the times of a repeating event that were changed on their own keep what they have.
+    const values: FormValues = { title, calendar, allDay, startDate, startTime, endDate, endTime, timezone, location, repeat, attendees: JSON.stringify(attendees), description };
+    const changed = (key: keyof FormValues) => !existing || !initial || (values[key] !== initial[key]);
+    const timesChanged = (["allDay", "startDate", "startTime", "endDate", "endTime", "timezone"] as const).some(changed);
+    const apply = (x: ICAL.Event) => {
+      if (changed("title")) {
+        x.summary = title;
+      }
+      if (changed("location")) {
+        x.location = location;
+      }
+      if (changed("description")) {
+        x.description = description;
+      }
+      if (changed("attendees")) {
+        setAttendees(x.component, attendees);
+      }
+    };
+
+    const event = existing?.clone() ?? new EventType();
+    if (which === "this") {
+      changeOccurrence(event, rid!, (x) => {
+        apply(x);
+        if (timesChanged) {
+          x.startDate = icalStart;
+          x.endDate = icalEnd;
+        }
+      });
+    } else {
+      if (!existing) {
+        event.uid = uuid.v4();
+      }
+      apply(event);
+      if (timesChanged || !existing) {
+        if (rid && shownStart) {
+          // The form had one of its times: all of them move as far as that one did
+          const start = moveTime(existing!.startDate, shownStart, icalStart);
+          event.startDate = start;
+          event.endDate = addSeconds(start, icalEnd.subtractDate(icalStart).toSeconds());
+        } else {
+          event.startDate = icalStart;
+          event.endDate = icalEnd;
+        }
+      }
+      applyRepeat(event.component, repeat);
+      if (existing) {
+        // (its changed and cancelled times are kept with it)
+        updateSeries(event, existing);
+        bumpSequence(event.component);
+      }
+    }
     event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
-    setAttendees(event.component, attendees);
 
     setSaving(true);
     try {
-      await savePimItem(etebase, calendar, event);
-      dispatch(pushMessage({ message: (existing) ? "Event saved" : "Event created", severity: "success" }) as any);
+      await savePimItem(etebase, calendar!, event);
+      dispatch(pushMessage({ message: (!existing) ? "Event created" : (which === "this") ? "This time of the event was saved" : "Event saved", severity: "success" }) as any);
       goUp(navigation, props.route);
     } catch (e) {
       setError((e as Error).message);
@@ -197,12 +294,23 @@ export default function EventEditScreen(props: PropsType) {
     }
   }
 
-  async function remove() {
+  async function remove(which: "this" | "all") {
     setDeleteShown(false);
-    await deletePimItem(etebase, existing!);
-    dispatch(pushMessage({ message: "Event deleted", severity: "success" }) as any);
+    if (which === "this") {
+      const event = existing!.clone();
+      excludeOccurrence(event, rid!);
+      event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
+      await savePimItem(etebase, existing!.collectionUid!, event);
+      dispatch(pushMessage({ message: "This time of the event was deleted", severity: "success" }) as any);
+    } else {
+      await deletePimItem(etebase, existing!);
+      dispatch(pushMessage({ message: "Event deleted", severity: "success" }) as any);
+    }
     goUp(navigation, props.route);
   }
+
+  const repeating = !!existing?.isRecurring();
+  const atTime = !!rid && repeating;
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled">
@@ -264,9 +372,16 @@ export default function EventEditScreen(props: PropsType) {
         <Field label="Repeat">
           <RepeatPicker value={repeat} onChange={setRepeat} />
         </Field>
-        {existing?.isRecurring() && (
+        {repeating && (
+          <Text style={{ color: theme.colors.textMuted, marginBottom: 14 }} testID="repeat-note">
+            {(atTime) ?
+              `This is the time on ${fmt.day.format(shownStart!.toJSDate())} of a repeating event. When you save, you choose whether the changes are for only this time or for all of them.` :
+              "Changes to a repeating event change all of its times."}
+          </Text>
+        )}
+        {repeating && (repeat !== initial?.repeat) && hasChangedTimes(existing!) && (
           <Text style={{ color: theme.colors.textMuted, marginBottom: 14 }}>
-            Changes to a repeating event change all of its times.
+            When it repeats in another way, the times of it that were changed or deleted on their own are as the new rule makes them.
           </Text>
         )}
         <Field label="Attendees">
@@ -281,14 +396,32 @@ export default function EventEditScreen(props: PropsType) {
         <HelperText type="error" visible={!!error}>{error}</HelperText>
         <AccentButton label={(saving) ? "Saving…" : "Save"} disabled={saving} onPress={save} style={{ alignSelf: "flex-end" }} />
       </View>
-      <ConfirmationDialog
-        title="Delete Event"
-        visible={deleteShown}
-        onOk={remove}
-        onCancel={() => setDeleteShown(false)}
-      >
-        <Text>Delete "{existing?.title}"?</Text>
-      </ConfirmationDialog>
+      {(atTime) ? (deleteShown && (
+        <RepeatChoiceDialog
+          title="Delete a repeating event"
+          message={`“${existing?.title || "(no title)"}” repeats. Delete only this time, or all of its times?`}
+          danger
+          onChoose={remove}
+          onClose={() => setDeleteShown(false)}
+        />
+      )) : (
+        <ConfirmationDialog
+          title="Delete Event"
+          visible={deleteShown}
+          onOk={() => remove("all")}
+          onCancel={() => setDeleteShown(false)}
+        >
+          <Text>Delete "{existing?.title}"?</Text>
+        </ConfirmationDialog>
+      )}
+      {choice && (
+        <RepeatChoiceDialog
+          title="Save a repeating event"
+          message={`“${title || "(no title)"}” repeats. Save the changes for only this time, or for all of its times?`}
+          onChoose={(which) => saveEvent(choice.start, choice.end, which)}
+          onClose={() => setChoice(undefined)}
+        />
+      )}
     </ScrollView>
   );
 }

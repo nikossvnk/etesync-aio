@@ -18,9 +18,10 @@ import { StoreState } from "../store";
 import { pushMessage, setSettings } from "../store/actions";
 import { TaskType } from "./pim-types";
 import { savePimItem, usePimItems } from "./data";
-import { AccentButton, EmptyState, toDateString } from "./widgets";
+import { AccentButton, EmptyState, repeatKeyOf, toDateString } from "./widgets";
+import { bumpSequence, changeOccurrence, occurrenceId, updateSeries } from "./recurrence";
 import { useDateFormats } from "./format";
-import { useDialogs } from "./Dialogs";
+import { RepeatChoiceDialog, useDialogs } from "./Dialogs";
 import TimeGrid, { mono, tint } from "./TimeGrid";
 import { addDays, dayCount, isBar, layoutBars, Occurrence, onDay, sameDay, startOfDay, useOccurrences } from "./occurrences";
 import { Agenda, DayPanel, EventDetails, MiniMonth, panelStyle, SmallButton, SpanBar, TasksDue } from "./CalendarParts";
@@ -64,6 +65,8 @@ export default function CalendarScreen() {
   const [selected, setSelected] = React.useState(today);
   // The event chosen in the week view, whose details are shown next to it
   const [selectedKey, setSelectedKey] = React.useState<string>();
+  // A time of a repeating event that was dragged, while it's asked whether only that time moves
+  const [moved, setMoved] = React.useState<{ x: Occurrence, start: Date, end: Date }>();
   // The width of the month's weeks, to put the bars of the events of several days over their days
   const [rowWidth, setRowWidth] = React.useState(0);
   const tasks = usePimItems(etebase, C.tasksType, TaskType.parse);
@@ -129,37 +132,72 @@ export default function CalendarScreen() {
     });
   }
 
-  // Events open in their editor, birthdays open their contact
+  // Events open in their editor (a repeating one at the time that was chosen), birthdays open their
+  // contact
   function open(x: Occurrence) {
     if (x.event) {
-      navigation.navigate("EventEdit", { colUid: x.event.collectionUid, itemUid: x.event.itemUid });
+      navigation.navigate("EventEdit", { colUid: x.event.collectionUid, itemUid: x.event.itemUid, ...((x.recurrenceId) ? { occurrence: occurrenceId(x.recurrenceId) } : {}) });
     } else if (x.contact) {
       navigation.navigate("Contact", { colUid: x.contact.collectionUid, itemUid: x.contact.itemUid });
     }
   }
 
-  // An event was dragged to another time: its start and end move by as much (for a repeating event,
-  // all of its times do)
-  async function changeTime(x: Occurrence, start: Date, end: Date) {
+  // An event was dragged to another time: its start and end move by as much. For a repeating event
+  // it's asked whether only that time moves, or all of them.
+  function changeTime(x: Occurrence, start: Date, end: Date) {
+    if (x.repeats && x.recurrenceId) {
+      setMoved({ x, start, end });
+    } else {
+      moveEvent(x, start, end, "all");
+    }
+  }
+
+  async function moveEvent(x: Occurrence, start: Date, end: Date, which: "this" | "all") {
+    setMoved(undefined);
     const event = x.event!.clone();
     const shift = (before: Date, after: Date, time: ICAL.Time) => {
       const ret = time.clone();
       ret.addDuration(ICAL.Duration.fromSeconds(Math.round((after.getTime() - before.getTime()) / 1000)));
       return ret;
     };
-    const newStart = shift(x.start, start, event.startDate);
-    const newEnd = shift(x.end, end, event.endDate ?? event.startDate);
-    event.startDate = newStart;
-    event.endDate = newEnd;
+    if (which === "this") {
+      changeOccurrence(event, x.recurrenceId!, (changed) => {
+        const newStart = shift(x.start, start, changed.startDate);
+        const newEnd = shift(x.end, end, changed.endDate ?? changed.startDate);
+        changed.startDate = newStart;
+        changed.endDate = newEnd;
+      });
+    } else {
+      const newStart = shift(x.start, start, event.startDate);
+      const newEnd = shift(x.end, end, event.endDate ?? event.startDate);
+      event.startDate = newStart;
+      event.endDate = newEnd;
+      // (its cancelled and changed times move with it)
+      updateSeries(event, x.event!);
+      bumpSequence(event.component);
+    }
     event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
     await savePimItem(etebase, event.collectionUid!, event);
     setSelectedKey(undefined);
     const when = `${(sameDay(start, x.start)) ? "" : fmt.day.format(start) + ", "}${fmt.time(start)} – ${fmt.time(end)}`;
     dispatch(pushMessage({
-      message: (x.repeats) ? `All times of “${x.title}” were moved to ${fmt.time(start)} – ${fmt.time(end)}` : `“${x.title}” moved to ${when}`,
+      message: (x.repeats && (which === "all")) ? `All times of “${x.title}” were moved to ${(sameDay(start, x.start)) ? "" : "another day, "}${fmt.time(start)} – ${fmt.time(end)}` : `“${x.title}” moved to ${when}`,
       severity: "success",
     }) as any);
   }
+
+  // The dialog that asks which times of a repeating event move. All of them can't move to another day
+  // when the rule says on which days it is (e.g. every week on Monday and Wednesday).
+  const moveDialog = (moved) && (
+    <RepeatChoiceDialog
+      title="Move a repeating event"
+      message={`“${moved.x.title}” repeats. Move only this time, or all of its times?`}
+      onlyThis={(!sameDay(moved.start, moved.x.start) && (repeatKeyOf(moved.x.event!.rrule) === "custom")) ?
+        "Its other times can't be moved to another day, because of the days it repeats on." : undefined}
+      onChoose={(which) => moveEvent(moved.x, moved.start, moved.end, which)}
+      onClose={() => setMoved(undefined)}
+    />
+  );
 
   const muted = (text: string | number, size?: number) => (
     <Text style={[styles.titleMuted, { color: theme.colors.textMuted }, (size) ? { fontSize: size } : undefined]}>{text}</Text>
@@ -296,6 +334,7 @@ export default function CalendarScreen() {
             <EventDetails x={selectedOccurrence} fmt={fmt} onEdit={open} onOpenContact={open} />,
             "event-panel"
           )}
+          {moveDialog}
           {wide && (view === "day") && side(
             <>
               <MiniMonth selected={selected} days={miniDays} occurrences={occurrences} fmt={fmt} onPick={select} />

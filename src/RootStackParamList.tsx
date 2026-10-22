@@ -29,7 +29,7 @@ export type RootStackParamList = {
     itemUid: string;
   };
   Calendar: undefined;
-  EventEdit: { colUid?: string, itemUid?: string, date?: string, time?: string, title?: string, attendeeName?: string, attendeeEmail?: string } | undefined;
+  EventEdit: { colUid?: string, itemUid?: string, occurrence?: string, date?: string, time?: string, title?: string, attendeeName?: string, attendeeEmail?: string } | undefined;
   Tasks: undefined;
   TaskEdit: { colUid?: string, itemUid?: string } | undefined;
   Contacts: undefined;

@@ -235,7 +235,9 @@ run(async () => {
   }))), serverDetail(types.calendar)());
   await p.getByRole("button", { name: `Event Yoga ${n}` }).locator("visible=true").first().click(); await wait(2000);
   await btn(/^remove bob example$/i).click(); await wait(300);
-  await btn(/^save$/i).click(); await wait(3000);
+  // (it repeats, so saving asks whether it's for all of its times)
+  await btn(/^save$/i).click(); await wait(1000);
+  await btn(/^all times$/i).click(); await wait(3000);
   check("and removed again", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => {
     const flat = c.replace(/\r\n /g, "");
     return flat.includes(`SUMMARY:Yoga ${n}`) && flat.includes(`CN=Ada Lovelace ${n}`) && !flat.includes("Bob Example");
@@ -245,7 +247,8 @@ run(async () => {
   // The standup repeats with a rule the editor can't make, which is kept when it's changed
   await p.getByRole("button", { name: `Event Standup ${n}` }).locator("visible=true").first().click(); await wait(2000);
   check("a rule the editor can't make shows as custom", (await btn(/^repeat custom$/i).getAttribute("aria-selected")) === "true");
-  await btn(/^save$/i).click(); await wait(2500);
+  await btn(/^save$/i).click(); await wait(1000);
+  await btn(/^all times$/i).click(); await wait(2500);
   check("and is kept when the event is saved", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
     x.contents.some((c) => c.includes(`SUMMARY:Standup ${n}`) && c.includes("RRULE:FREQ=WEEKLY;BYDAY=")))), serverDetail(types.calendar)());
 

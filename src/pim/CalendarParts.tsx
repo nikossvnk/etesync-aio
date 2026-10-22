@@ -174,7 +174,7 @@ export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: 
   if (!x) {
     return <Text style={{ color: theme.colors.textMuted }}>Select an event to see its details.</Text>;
   }
-  const description = x.event?.description;
+  const description = x.description;
   return (
     <View style={{ gap: 14 }} testID="event-details">
       <View style={styles.iconRow}>
@@ -185,7 +185,7 @@ export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: 
       <View>
         <Text style={{ color: theme.colors.textSecondary }}>{formatDays(x, fmt)}</Text>
         <Text style={[styles.mono, { fontSize: 13, color: theme.colors.textSecondary }]}>{formatRange(x, fmt)}</Text>
-        {x.repeats && x.event && <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 2 }}>Repeats</Text>}
+        {x.repeats && x.event && <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 2 }}>{(x.changed) ? "Repeats (this time was changed)" : "Repeats"}</Text>}
       </View>
       {!!x.location && <Place location={x.location} />}
       {(x.attendees.length > 0) && (

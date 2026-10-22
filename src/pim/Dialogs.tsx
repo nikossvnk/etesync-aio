@@ -124,6 +124,31 @@ function Frame(props: React.PropsWithChildren<{ title: string, steps?: { labels:
   );
 }
 
+// Asks whether a change to one time of a repeating event (or deleting it) is for only that time, or
+// for all of them. "All times" isn't offered for a change that can only be made to that time (the
+// reason is then told).
+export function RepeatChoiceDialog(props: { title: string, message: string, onChoose: (which: "this" | "all") => void, onClose: () => void, danger?: boolean, onlyThis?: string }) {
+  const theme = useTheme();
+  return (
+    <Frame
+      title={props.title}
+      onClose={props.onClose}
+      width={480}
+      testID="repeat-choice"
+      footer={(
+        <>
+          <Button label="Cancel" onPress={props.onClose} />
+          {!props.onlyThis && <Button label="All times" danger={props.danger} onPress={() => props.onChoose("all")} />}
+          <Button label="Only this time" primary onPress={() => props.onChoose("this")} />
+        </>
+      )}
+    >
+      <Text style={{ fontSize: 14, color: theme.colors.textBody }}>{props.message}</Text>
+      {!!props.onlyThis && <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>{props.onlyThis}</Text>}
+    </Frame>
+  );
+}
+
 export function Button(props: { label: string, onPress: () => void, primary?: boolean, disabled?: boolean, danger?: boolean, icon?: string }) {
   const theme = useTheme();
   const color = (props.primary) ? theme.colors.onAccent : (props.danger) ? theme.colors.error : theme.colors.text;

@@ -109,12 +109,12 @@ function EventBlock(props: EventBlockProps) {
   const canDrag = !!props.onChange && !!x.event;
 
   // What a drag does: the minutes it moves the event (or its end) by, and the days it moves it by.
-  // Repeating events only move to another time of the same day (another day would change their rule).
+  // (for a repeating event, the calendar then asks whether it's only this time that moves)
   function dragResult(mode: "move" | "resize", dx: number, dy: number) {
     const { dayIndex, dayCount, columnWidth } = latest.current;
     if (mode === "move") {
       const minutes = snap(dy / hourHeight * 60);
-      let days = (!x.repeats && (columnWidth > 0)) ? Math.round(dx / columnWidth) : 0;
+      let days = (columnWidth > 0) ? Math.round(dx / columnWidth) : 0;
       days = Math.max(-dayIndex, Math.min(days, dayCount - 1 - dayIndex));
       const start = new Date(x.start.getTime() + minutes * 60000);
       start.setDate(start.getDate() + days);

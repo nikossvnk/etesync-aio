@@ -35,8 +35,13 @@ export interface Occurrence {
   colUid: string;
   calendarName: string;
   location: string;
+  description: string;
   attendees: Attendee[];
   repeats: boolean;
+  // Which time of a repeating event it is (its start, as the rule makes it), and whether that time
+  // was changed (e.g. moved, or given another title)
+  recurrenceId?: ICAL.Time;
+  changed?: boolean;
   // The event (none for birthdays), and the contact of a birthday
   event?: EventType;
   contact?: ContactType;
@@ -54,7 +59,7 @@ export function sameDay(a: Date, b: Date) {
   return startOfDay(a).getTime() === startOfDay(b).getTime();
 }
 
-export function eventAttendees(event: EventType): Attendee[] {
+export function eventAttendees(event: ICAL.Event): Attendee[] {
   return event.component.getAllProperties("attendee").map((prop) => {
     const value = String(prop.getFirstValue() ?? "");
     const email = (value.toLowerCase().startsWith("mailto:")) ? value.slice(7) : undefined;
@@ -114,30 +119,40 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
       return;
     }
     const calendar = byUid.get(event.collectionUid!);
-    const allDay = event.startDate.isDate;
-    const start = event.startDate.toJSDate();
-    const end = event.endDate?.toJSDate() ?? ((allDay) ? addDays(start, 1) : start);
-    const length = end.getTime() - start.getTime();
     const repeats = event.isRecurring();
-    const attendees = eventAttendees(event);
-    const add = (s: Date) => {
-      const e = new Date(s.getTime() + length);
+    // A time of the event, which (for a repeating one) can have been changed: then it has a time,
+    // title, etc. of its own. One that was cancelled that way (instead of with EXDATE, as some apps
+    // do) isn't shown.
+    const add = (item: ICAL.Event, startTime: ICAL.Time, endTime: ICAL.Time | undefined, recurrenceId?: ICAL.Time) => {
+      if ((item !== event) && (String(item.component.getFirstPropertyValue("status") ?? "").toUpperCase() === "CANCELLED")) {
+        return;
+      }
+      const allDay = startTime.isDate;
+      const s = startTime.toJSDate();
+      const e = endTime?.toJSDate() ?? ((allDay) ? addDays(s, 1) : s);
       if (((e > from) || (s >= from)) && (s < to)) {
         ret.push({
-          key: `${event.collectionUid}/${event.itemUid}/${s.getTime()}`,
-          title: event.title || "(no title)",
+          key: `${event.collectionUid}/${event.itemUid}/${(recurrenceId ?? startTime).toString()}`,
+          title: item.summary || "(no title)",
           start: s,
           end: e,
           allDay,
           color: calendar?.color ?? defaultColor,
           colUid: event.collectionUid!,
           calendarName: calendar?.name ?? "",
-          location: event.location ?? "",
-          attendees,
+          location: item.location ?? "",
+          description: item.description ?? "",
+          attendees: eventAttendees(item),
           repeats,
+          recurrenceId,
+          changed: item !== event,
           event,
         });
       }
+    };
+    const addTime = (recurrenceId: ICAL.Time) => {
+      const details = event.getOccurrenceDetails(recurrenceId);
+      add(details.item ?? event, details.startDate, details.endDate, recurrenceId);
     };
     try {
       if (repeats) {
@@ -145,13 +160,19 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
         let next;
         let count = 0;
         while ((next = recur.next()) && (next.compare(toTime) < 0) && (count++ < 50000)) {
-          add(next.toJSDate());
+          addTime(next);
+        }
+        // (a time after these that was changed to one before the end)
+        for (const changed of Object.values(event.exceptions)) {
+          if (changed.recurrenceId.compare(toTime) >= 0) {
+            addTime(changed.recurrenceId);
+          }
         }
       } else {
-        add(start);
+        add(event, event.startDate, event.endDate);
       }
     } catch (e) {
-      add(start);
+      add(event, event.startDate, event.endDate);
     }
   }
 
@@ -174,6 +195,7 @@ export function occurrencesBetween(events: EventType[], calendars: PimCollection
           colUid: birthdaysUid,
           calendarName: "Birthdays",
           location: "",
+          description: "",
           attendees: [],
           repeats: true,
           contact,

@@ -156,9 +156,10 @@ exports.api = {
 };
 
 // A browser session (its own context, so like a separate device) with helpers for driving the app
-// (900 pixels wide by default, which is too narrow for the sidebar of wide screens)
-exports.session = async (browser, tag, viewport = { width: 900, height: 700 }) => {
-  const ctx = await browser.newContext({ viewport });
+// (900 pixels wide by default, which is too narrow for the sidebar of wide screens), and more options
+// of its browser context (e.g. its time zone)
+exports.session = async (browser, tag, viewport = { width: 900, height: 700 }, options = {}) => {
+  const ctx = await browser.newContext({ viewport, ...options });
   const p = await ctx.newPage();
   p.setDefaultTimeout(10000);
   p.on("pageerror", (e) => console.log(tag, "PAGEERROR", e.message));

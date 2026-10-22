@@ -58,12 +58,40 @@ export function parseString(content: string) {
   return new ICAL.Component(ICAL.parse(content));
 }
 
+function copyComponent(comp: ICAL.Component) {
+  return ICAL.Component.fromString(comp.toString());
+}
+
+// The components of an item (an event or a task): the event itself, the times of it that were
+// changed (more components with its UID and a RECURRENCE-ID), and any others, which are kept as they
+// are. The event itself is the one without a RECURRENCE-ID, which doesn't have to be the first.
+function splitItem(comp: ICAL.Component, name: string) {
+  // The time zones of the item are used for its times when the app doesn't know them (e.g. ones
+  // with a name of another app)
+  for (const zone of comp.getAllSubcomponents("vtimezone")) {
+    const tzid = String(zone.getFirstPropertyValue("tzid") ?? "");
+    if (tzid && !timezoneLoadFromName(tzid) && !ICAL.TimezoneService.has(tzid)) {
+      ICAL.TimezoneService.register(tzid, new ICAL.Timezone(copyComponent(zone)));
+    }
+  }
+  const all = comp.getAllSubcomponents(name);
+  const main = all.find((x) => !x.hasProperty("recurrence-id")) ?? all[0] ?? null;
+  const uid = main?.getFirstPropertyValue("uid");
+  const exceptions = (main && !main.hasProperty("recurrence-id")) ?
+    all.filter((x) => (x !== main) && x.hasProperty("recurrence-id") && (x.getFirstPropertyValue("uid") === uid)) : [];
+  const others = all.filter((x) => (x !== main) && !exceptions.includes(x));
+  return { main: (main) ? copyComponent(main) : null, exceptions: exceptions.map(copyComponent), others: others.map(copyComponent) };
+}
+
 export class EventType extends ICAL.Event implements PimType {
   public collectionUid?: string;
   public itemUid?: string;
   // The color of the collection the event is in, which it's shown with. It's not a part of the event
   // itself, so this replaces the accessor of ical.js, which sets the COLOR property of the event.
   private _color?: string;
+  // Other components of the item (e.g. changed times without the event they belong to), which are
+  // saved as they are
+  public others: ICAL.Component[] = [];
 
   get color(): string | undefined {
     return this._color;
@@ -78,7 +106,9 @@ export class EventType extends ICAL.Event implements PimType {
   }
 
   public static fromVCalendar(comp: ICAL.Component) {
-    const event = new EventType(comp.getFirstSubcomponent("vevent"));
+    const { main, exceptions, others } = splitItem(comp, "vevent");
+    const event = new EventType(main, { exceptions });
+    event.others = others;
     // FIXME: we need to clone it so it loads the correct timezone and applies it
     timezoneLoadFromName(event.timezone);
     return event.clone();
@@ -138,18 +168,38 @@ export class EventType extends ICAL.Event implements PimType {
     this.component.updatePropertyWithValue("rrule", rule);
   }
 
+  // The components of the times of a repeating event (or task) that were changed
+  get changedTimes(): ICAL.Component[] {
+    return Object.values(this.exceptions).map((x) => x.component);
+  }
+
+  // Replaces the times that were changed (they're looked up by their RECURRENCE-ID, so this is also
+  // needed after one of those is changed)
+  public setChangedTimes(comps: ICAL.Component[]) {
+    this.exceptions = Object.create(null);
+    this.rangeExceptions = [];
+    (this as any)._rangeExceptionCache = Object.create(null);
+    for (const comp of comps) {
+      this.relateException(comp);
+    }
+  }
+
   public toIcal() {
     const comp = new ICAL.Component(["vcalendar", [], []]);
     comp.updatePropertyWithValue("prodid", PRODID);
     comp.updatePropertyWithValue("version", "2.0");
 
     comp.addSubcomponent(this.component);
+    for (const x of [...this.changedTimes, ...this.others]) {
+      comp.addSubcomponent(x);
+    }
     ICAL.helpers.updateTimezones(comp);
     return comp.toString();
   }
 
   public clone() {
-    const ret = new EventType(ICAL.Component.fromString(this.component.toString()));
+    const ret = new EventType(copyComponent(this.component), { exceptions: this.changedTimes.map(copyComponent) });
+    ret.others = this.others.map(copyComponent);
     ret.color = this.color;
     ret.collectionUid = this.collectionUid;
     ret.itemUid = this.itemUid;
@@ -180,7 +230,9 @@ export function setTaskTags(tags: string[]) {
 export class TaskType extends EventType {
 
   public static fromVCalendar(comp: ICAL.Component) {
-    const task = new TaskType(comp.getFirstSubcomponent("vtodo"));
+    const { main, exceptions, others } = splitItem(comp, "vtodo");
+    const task = new TaskType(main, { exceptions });
+    task.others = others;
     // FIXME: we need to clone it so it loads the correct timezone and applies it
     timezoneLoadFromName(task.timezone);
     return task.clone();
@@ -190,8 +242,8 @@ export class TaskType extends EventType {
     return TaskType.fromVCalendar(parseString(content));
   }
 
-  constructor(comp?: ICAL.Component | null) {
-    super(comp ? comp : new ICAL.Component("vtodo"));
+  constructor(comp?: ICAL.Component | null, options?: { exceptions?: ICAL.Component[] }) {
+    super(comp ? comp : new ICAL.Component("vtodo"), options ?? { exceptions: [] });
   }
 
   get finished() {
@@ -305,7 +357,8 @@ export class TaskType extends EventType {
   }
 
   public clone() {
-    const ret = new TaskType(ICAL.Component.fromString(this.component.toString()));
+    const ret = new TaskType(copyComponent(this.component), { exceptions: this.changedTimes.map(copyComponent) });
+    ret.others = this.others.map(copyComponent);
     ret.color = this.color;
     return ret;
   }
@@ -341,7 +394,10 @@ export class TaskType extends EventType {
       nextDueDate.addDuration(offset);
     }
 
+    // (the times of this one that were changed aren't times of the next one, which is a task of its own)
     const nextTask = this.clone();
+    nextTask.setChangedTimes([]);
+    nextTask.others = [];
     nextTask.uid = uuid.v4();
     if (nextStartDate) {
       nextTask.startDate = nextStartDate;

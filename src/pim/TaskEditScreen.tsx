@@ -24,6 +24,7 @@ import { TaskStatusType, TaskType } from "./pim-types";
 import { priorityName } from "./TasksScreen";
 import { useTheme } from "../theme";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
+import { updateSeries } from "./recurrence";
 import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString } from "./widgets";
 
 interface PropsType {
@@ -139,6 +140,10 @@ export default function TaskEditScreen(props: PropsType) {
       return;
     }
     applyRepeat(task.component, repeat);
+    if (existing) {
+      // (the times of a repeating task that were changed or cancelled on their own are kept with it)
+      updateSeries(task, existing);
+    }
     task.lastModified = ICAL.Time.now();
 
     try {

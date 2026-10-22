@@ -25,7 +25,8 @@ import { priorityName } from "./TasksScreen";
 import { useTheme } from "../theme";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
 import { updateSeries } from "./recurrence";
-import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, toDateString } from "./widgets";
+import { Reminder, reminderKey, remindersOf, setReminders } from "./reminders";
+import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, ReminderPicker, RepeatKey, repeatKeyOf, RepeatPicker, toDateString } from "./widgets";
 
 interface PropsType {
   route: RouteProp<RootStackParamList, "TaskEdit">;
@@ -50,6 +51,7 @@ export default function TaskEditScreen(props: PropsType) {
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState("None");
   const [repeat, setRepeat] = React.useState<RepeatKey>("none");
+  const [reminders, setRemindersState] = React.useState<Reminder[]>([]);
   const [error, setError] = React.useState<string>();
   const [deleteShown, setDeleteShown] = React.useState(false);
 
@@ -65,6 +67,7 @@ export default function TaskEditScreen(props: PropsType) {
       setDescription(existing.description ?? "");
       setPriority(priorityName(existing));
       setRepeat(repeatKeyOf(existing.isRecurring() ? existing.rrule : null));
+      setRemindersState(remindersOf(existing.component));
     } else {
       setList(colUid ?? lists[0]?.colUid);
     }
@@ -140,6 +143,14 @@ export default function TaskEditScreen(props: PropsType) {
       return;
     }
     applyRepeat(task.component, repeat);
+    if ((reminders.length > 0) && !dueDate && !task.startDate) {
+      setError("A task with reminders needs a due date");
+      return;
+    }
+    // (only when they were changed, so ones another app made relative to something else stay)
+    if (!existing || (reminders.map(reminderKey).join("\n") !== remindersOf(existing.component).map(reminderKey).join("\n")) || (!!existing.dueDate !== !!dueDate)) {
+      setReminders(task.component, reminders);
+    }
     if (existing) {
       // (the times of a repeating task that were changed or cancelled on their own are kept with it)
       updateSeries(task, existing);
@@ -176,6 +187,9 @@ export default function TaskEditScreen(props: PropsType) {
             <DateTimeInput mode="date" value={due} onChange={setDue} accessibilityLabel="Due date" />
             {!!due && <Text onPress={() => setDue("")} style={{ textDecorationLine: "underline" }}>Clear</Text>}
           </View>
+        </Field>
+        <Field label="Reminders">
+          <ReminderPicker value={reminders} onChange={setRemindersState} allDay={!existing?.dueDate || existing.dueDate.isDate} isTask />
         </Field>
         <Field label="Repeat">
           <RepeatPicker value={repeat} onChange={setRepeat} />

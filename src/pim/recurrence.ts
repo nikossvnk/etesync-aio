@@ -154,11 +154,15 @@ function sameText(a: ICAL.Component, b: ICAL.Component, name: string) {
   return a.getAllProperties(name).map((x) => x.toICALString()).join("\n") === b.getAllProperties(name).map((x) => x.toICALString()).join("\n");
 }
 
+function alarmsText(comp: ICAL.Component) {
+  return comp.getAllSubcomponents("valarm").map((x) => x.toString()).join("\n");
+}
+
 // After all of the times of a repeating event were changed (the event was before), its changed and
 // cancelled times are kept with it:
 // - When the start moved, they move as far, and so does the end of the rule (UNTIL). A changed time
 //   that was still at its own time moves too.
-// - What was changed of the event (e.g. the title) is changed in the changed times that had what the
+// - What was changed of the event (e.g. the title, or the reminders) is changed in the changed times that had what the
 //   event had.
 // - When it repeats in another way, or not anymore, they are the times of a rule that's gone, so
 //   they're removed.
@@ -213,6 +217,15 @@ export function updateSeries(event: EventType, before: EventType) {
         for (const prop of event.component.getAllProperties(name)) {
           changed.component.addProperty(new ICAL.Property(prop.toJSON()));
         }
+      }
+    }
+    // (and so are the reminders)
+    if ((alarmsText(changed.component) === alarmsText(before.component)) && (alarmsText(changed.component) !== alarmsText(event.component))) {
+      for (const alarm of changed.component.getAllSubcomponents("valarm")) {
+        changed.component.removeSubcomponent(alarm);
+      }
+      for (const alarm of event.component.getAllSubcomponents("valarm")) {
+        changed.component.addSubcomponent(ICAL.Component.fromString(alarm.toString()));
       }
     }
   }

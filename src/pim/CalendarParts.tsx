@@ -14,6 +14,7 @@ import { DateFormats } from "./format";
 import { addDays, Bar, dayCount, dayOf, initials, Occurrence, onDay, startOfDay } from "./occurrences";
 import { TaskType } from "./pim-types";
 import { mono, tint } from "./style";
+import { reminderLabel, remindersOf } from "./reminders";
 
 // When an event is, e.g. "10:00 – 11:00", "All day", "All day · 4 days", or on one of its days "All
 // day · day 2 of 4"
@@ -175,6 +176,9 @@ export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: 
     return <Text style={{ color: theme.colors.textMuted }}>Select an event to see its details.</Text>;
   }
   const description = x.description;
+  // (of the time that was changed, which can have its own)
+  const item = (x.event && x.changed && x.recurrenceId) ? x.event.getOccurrenceDetails(x.recurrenceId).item : x.event;
+  const reminders = (item) ? remindersOf(item.component).map((r) => reminderLabel(r, x.allDay, false, fmt)) : [];
   return (
     <View style={{ gap: 14 }} testID="event-details">
       <View style={styles.iconRow}>
@@ -188,6 +192,12 @@ export function EventDetails(props: { x?: Occurrence, fmt: DateFormats, onEdit: 
         {x.repeats && x.event && <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 2 }}>{(x.changed) ? "Repeats (this time was changed)" : "Repeats"}</Text>}
       </View>
       {!!x.location && <Place location={x.location} />}
+      {(reminders.length > 0) && (
+        <View style={styles.iconRow} accessibilityLabel={`Reminders: ${reminders.join(", ")}`} testID="event-reminders">
+          <MaterialCommunityIcons name="bell-outline" size={14} color={theme.colors.textSecondary} />
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, flexShrink: 1 }}>{reminders.join(", ")}</Text>
+        </View>
+      )}
       {(x.attendees.length > 0) && (
         <View style={{ gap: 6 }}>
           <People x={x} size={28} />

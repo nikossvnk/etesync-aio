@@ -1,6 +1,6 @@
 // Serves the web build of the app (default: ../web-build) on port 8765, with every unknown path
 // answered by index.html, so that the app's own URLs (e.g. /settings/about) work when loaded directly.
-// /bookmark-title reads the title of a web page, like desktop/serve.py does.
+// /bookmark-title reads the title of a web page, and /reminders takes the reminders, like desktop/serve.py does.
 const http = require("http"), fs = require("fs"), path = require("path");
 const root = path.resolve(process.argv[2] || path.join(__dirname, "..", "web-build"));
 const port = Number(process.env.PORT || 8765);
@@ -18,7 +18,28 @@ async function pageTitle(url) {
   return (m) ? m[1].replace(/&(\w+|#\d+);/g, (all, x) => entities[x] ?? all).replace(/\s+/g, " ").trim() || null : null;
 }
 
+// The reminders the app handed over last (POST /reminders, as desktop/serve.py takes them), which the
+// tests read with GET /reminders
+let reminders = null;
+
 http.createServer(async (req, res) => {
+  if (req.url === "/reminders") {
+    if (req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ reminders }));
+      return;
+    }
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    if ((req.method !== "POST") || (req.headers["x-etesync-request"] !== "reminders")) {
+      res.writeHead(403).end();
+      return;
+    }
+    reminders = JSON.parse(Buffer.concat(chunks).toString()).reminders;
+    res.writeHead(204).end();
+    return;
+  }
   if (req.url.startsWith("/bookmark-title?")) {
     const url = new URL(req.url, "http://localhost").searchParams.get("url") || "";
     if ((req.headers["x-etesync-request"] !== "title") || !/^https?:/i.test(url)) {

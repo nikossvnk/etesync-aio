@@ -3,7 +3,9 @@
 
 Paths that aren't files are answered with index.html, so that the app's own URLs (e.g. /settings)
 also work when they are loaded directly. /bookmark-title reads the title of a web page for the
-bookmarks, which the browser doesn't let the app do itself. Installed and started by install.sh."""
+bookmarks, which the browser doesn't let the app do itself. /reminders takes the notifications of the
+reminders of events and tasks that are due soon, which this shows as notifications of the computer
+when it's time (also while the app's window is closed). Installed and started by install.sh."""
 import argparse
 import functools
 import html
@@ -11,6 +13,11 @@ import http.server
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -69,12 +76,141 @@ def page_title(url):
     return title[:500] or None
 
 
+class Reminders:
+    """The notifications the app handed over (each with when it's due), and the ones shown already.
+
+    They're kept in a file (only readable by the user), so that they're also shown after the computer
+    was restarted, before the app's window is opened again. One that was missed (e.g. while the
+    computer was asleep) is shown when it's at most an hour late."""
+
+    late = 3600
+    lock = threading.Lock()
+
+    def __init__(self, path=None):
+        self.path = path
+        self.notices = []
+        # (key, at) of the ones shown, kept for two days
+        self.shown = {}
+        if path and os.path.exists(path):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                self.notices = valid_notices(data.get("reminders", []))
+                self.shown = {k: float(v) for k, v in data.get("shown", {}).items()}
+            except (OSError, ValueError, AttributeError, TypeError):
+                pass
+
+    def save(self):
+        if not self.path:
+            return
+        directory = os.path.dirname(os.path.abspath(self.path))
+        fd, tmp = tempfile.mkstemp(dir=directory, prefix=".reminders.")
+        with os.fdopen(fd, "w") as f:
+            json.dump({"reminders": self.notices, "shown": self.shown}, f)
+        os.replace(tmp, self.path)
+
+    def replace(self, notices):
+        with self.lock:
+            self.notices = notices
+            self.save()
+
+    def due(self, now):
+        """The notifications to show now (each once), which are then recorded as shown."""
+        with self.lock:
+            ret = []
+            for notice in self.notices:
+                key = f"{notice['key']}@{notice['at']}"
+                if (notice["at"] / 1000 <= now) and (notice["at"] / 1000 > now - self.late) and (key not in self.shown):
+                    self.shown[key] = notice["at"] / 1000
+                    ret.append(notice)
+            for key, at in list(self.shown.items()):
+                if at < now - 2 * 86400:
+                    del self.shown[key]
+            if ret:
+                self.save()
+            return ret
+
+
+def valid_notices(items):
+    """The notifications in what the app sent, as they're kept (others are left out)."""
+    ret = []
+    for x in items[:1000] if isinstance(items, list) else []:
+        if (isinstance(x, dict) and isinstance(x.get("at"), (int, float)) and isinstance(x.get("key"), str)
+                and isinstance(x.get("title"), str) and isinstance(x.get("body", ""), str)):
+            ret.append({"key": x["key"][:300], "at": float(x["at"]), "title": x["title"][:300], "body": x.get("body", "")[:500]})
+    return ret
+
+
+ICON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.png")
+
+
+def notify(title, body):
+    """Shows a notification of the computer (with notify-send, or else D-Bus, which both reach the
+    desktop's notifications)."""
+    title = title or "Reminder"
+    if shutil.which("notify-send"):
+        command = ["notify-send", "--app-name=EteSync Desktop"]
+        if os.path.exists(ICON):
+            command.append(f"--icon={ICON}")
+        # (the body can have markup, which the event's text mustn't be taken as; "--" ends the options)
+        command += ["--", title, html.escape(body)]
+    elif shutil.which("gdbus"):
+        # (GVariant's strings are written like JSON's)
+        command = ["gdbus", "call", "--session", "--dest=org.freedesktop.Notifications",
+                   "--object-path=/org/freedesktop/Notifications", "--method=org.freedesktop.Notifications.Notify", "--",
+                   json.dumps("EteSync Desktop"), "0", json.dumps(ICON if os.path.exists(ICON) else ""),
+                   json.dumps(title), json.dumps(html.escape(body)), "[]", "{}", "-1"]
+    else:
+        print("Can't show a reminder: there's neither notify-send nor gdbus", flush=True)
+        return
+    try:
+        subprocess.run(command, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"Can't show a reminder: {e}", flush=True)
+
+
+def show_reminders(reminders, every):
+    while True:
+        for notice in reminders.due(time.time()):
+            notify(notice["title"], notice["body"])
+        time.sleep(every)
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     # Set by main(): the host names (with the port) that requests have to be for. Others are refused,
     # so that a web site can't reach this server through a DNS name it points to 127.0.0.1.
     allowed_hosts = set()
     # (the launcher, etesync-desktop, tells by it that it's this server answering on the port)
     server_version = "EteSyncDesktop"
+    # Set by main()
+    reminders = None
+
+    # Takes the notifications of the reminders that are due soon (they replace the ones it had). Only
+    # from the app, like /bookmark-title (a page of another site can't send this header, nor JSON).
+    def do_POST(self):
+        if self.path != "/reminders":
+            self.send_error(404, "Not Found")
+            return
+        if ((self.headers.get("Host", "").lower() not in self.allowed_hosts) or (self.headers.get("X-EteSync-Request") != "reminders")
+                or not self.headers.get("Content-Type", "").startswith("application/json")):
+            self.send_error(403, "Forbidden")
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        if not 0 < length <= 1000000:
+            self.send_error(413 if length > 0 else 400, "Too long" if length > 0 else "Bad Request")
+            return
+        try:
+            notices = valid_notices(json.loads(self.rfile.read(length)).get("reminders"))
+        except (ValueError, AttributeError):
+            self.send_error(400, "Bad Request")
+            return
+        self.reminders.replace(notices)
+        self.send_response(204)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
 
     def do_GET(self):
         if self.path.startswith("/bookmark-title?"):
@@ -134,8 +270,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8092)
     parser.add_argument("--dir", required=True, help="the web build to serve")
+    parser.add_argument("--reminders", help="the file the reminders that are due soon are kept in (default: only in memory)")
+    parser.add_argument("--check-every", type=float, default=15, help=argparse.SUPPRESS)
     args = parser.parse_args()
     Handler.allowed_hosts = {f"localhost:{args.port}", f"127.0.0.1:{args.port}"}
+    Handler.reminders = Reminders(args.reminders)
+    threading.Thread(target=show_reminders, args=(Handler.reminders, args.check_every), daemon=True).start()
     handler = functools.partial(Handler, directory=args.dir)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     print(f"Serving {args.dir} on http://localhost:{args.port}", flush=True)

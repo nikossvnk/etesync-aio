@@ -41,6 +41,7 @@ import { useCredentials } from "./credentials";
 import { performSync, popMessage } from "./store/actions";
 
 import { useAppStateCb } from "./helpers";
+import { useReminderNotices } from "./pim/notify";
 
 import * as C from "./constants";
 import { StoreState } from "./store";
@@ -66,6 +67,9 @@ export default React.memo(function RootNavigator() {
   // The calendar, the tasks and the contacts take the place of the notes column too
   const { currentScreen } = useWideNavigation();
   const notesShown = !pimScreens.includes(currentScreen ?? "") && !accountScreens.includes(currentScreen ?? "");
+
+  // The reminders of events and tasks, as notifications of the computer
+  useReminderNotices();
 
   // Sync app when it goes to background
   useAppStateCb(React.useCallback((_foreground) => {

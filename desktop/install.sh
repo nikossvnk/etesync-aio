@@ -104,7 +104,7 @@ if [ "$service" = "yes" ]; then
 Description=EteSync Desktop, served on $URL (this computer only)
 
 [Service]
-ExecStart=$(command -v python3) $BASE/serve.py --port $PORT --dir $SITE
+ExecStart=$(command -v python3) $BASE/serve.py --port $PORT --dir $SITE --reminders $BASE/reminders.json
 Restart=on-failure
 
 [Install]

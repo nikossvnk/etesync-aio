@@ -24,6 +24,7 @@ import { DateFormats, useDateFormats } from "./format";
 import { useDialogs } from "./Dialogs";
 import { addDays, sameDay, startOfDay } from "./occurrences";
 import { mono } from "./style";
+import { reminderLabel, remindersOf } from "./reminders";
 import { panelStyle, SmallButton } from "./CalendarParts";
 
 export function formatDue(task: TaskType, fmt: DateFormats) {
@@ -191,8 +192,7 @@ function TaskDetails(props: { task: TaskType, list?: PimCollection, subtasks: Ta
   const [newSub, setNewSub] = React.useState("");
   const due = task.dueDate;
   const created = task.component.getFirstPropertyValue("created") ?? task.component.getFirstPropertyValue("dtstamp");
-  const alarm = task.component.getFirstSubcomponent("valarm");
-  const trigger = alarm?.getFirstPropertyValue("trigger");
+  const reminders = remindersOf(task.component).map((x) => reminderLabel(x, !due || due.isDate, true, fmt));
   const done = subtasks.filter((x) => x.finished).length;
   const field = (label: string, value: React.ReactNode) => (
     <View style={styles.field}>
@@ -222,7 +222,7 @@ function TaskDetails(props: { task: TaskType, list?: PimCollection, subtasks: Ta
       </Text>
       <View style={{ gap: 10 }}>
         {field("Due", (due) ? `${fmt.day.format(due.toJSDate())}${(due.isDate) ? "" : `, ${fmt.time(due.toJSDate())}`}` : "No date")}
-        {(trigger) && field("Reminder", String(trigger))}
+        {(reminders.length > 0) && field((reminders.length === 1) ? "Reminder" : "Reminders", reminders.join(", "))}
         {field("Repeat", repeatName(task.rrule))}
         {field("List", (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

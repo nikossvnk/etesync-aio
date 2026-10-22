@@ -15,6 +15,7 @@ import { fonts, useTheme } from "../theme";
 import { PimCollection } from "./data";
 import { DateFormats, useDateFormats } from "./format";
 import * as zoneData from "./data/zones.json";
+import { Reminder, reminderKey, reminderLabel, reminderPresets } from "./reminders";
 
 export function ColorDot(props: { color: string, size?: number, style?: StyleProp<ViewStyle> }) {
   const size = props.size ?? 10;
@@ -544,6 +545,45 @@ export function TimezonePicker(props: { value: string, onChange: (zone: string) 
             </TouchableRipple>
           ))}
           {(matches.length === 0) && <Text style={[styles.zoneItem, { color: theme.colors.textMuted }]}>No time zone matches</Text>}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// The reminders of an event or a task: the ones it has (each can be removed), and the times that can
+// be added
+export function ReminderPicker(props: { value: Reminder[], onChange: (value: Reminder[]) => void, allDay: boolean, isTask?: boolean, disabled?: boolean }) {
+  const theme = useTheme();
+  const fmt = useDateFormats();
+  const [adding, setAdding] = React.useState(false);
+  const label = (x: Reminder) => reminderLabel(x, props.allDay, !!props.isTask, fmt);
+  const keys = props.value.map(reminderKey);
+  const offered = reminderPresets(props.allDay).filter((x) => !keys.includes(String(x)));
+  const chip = (text: string, accessibilityLabel: string, onPress: () => void, icon?: string, active?: boolean) => (
+    <TouchableRipple
+      key={accessibilityLabel}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      disabled={props.disabled}
+      onPress={onPress}
+      style={[styles.chip, { borderColor: (active) ? theme.colors.chipActive : theme.colors.border, backgroundColor: (active) ? theme.colors.chipActive : theme.colors.surface, opacity: (props.disabled) ? 0.5 : 1 }]}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <Text style={{ fontSize: 13, color: (active) ? theme.colors.onChipActive : theme.colors.textBody }}>{text}</Text>
+        {icon && <MaterialCommunityIcons name={icon as any} size={14} color={(active) ? theme.colors.onChipActive : theme.colors.textSecondary} />}
+      </View>
+    </TouchableRipple>
+  );
+  return (
+    <View style={{ gap: 8 }} testID="reminders">
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+        {props.value.map((x, i) => chip(label(x), `Remove reminder ${label(x)}`, () => props.onChange(props.value.filter((_y, j) => j !== i)), "close", true))}
+        {(offered.length > 0) && chip((adding) ? "Done" : "Add a reminder", (adding) ? "Done adding reminders" : "Add a reminder", () => setAdding(!adding), (adding) ? undefined : "plus")}
+      </View>
+      {adding && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }} testID="reminder-options">
+          {offered.map((x) => chip(label({ seconds: x }), `Remind ${label({ seconds: x })}`, () => props.onChange([...props.value, { seconds: x }].sort((a, b) => (a.seconds ?? 0) - (b.seconds ?? 0)))))}
         </View>
       )}
     </View>

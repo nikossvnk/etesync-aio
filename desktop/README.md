@@ -77,6 +77,12 @@ has the web build (`site/`), `serve.py`, `etesync-desktop`, `install.sh`, the ic
 - "Get title" of a bookmark makes the server fetch the page of its link, from this computer, to
   read its title (the browser doesn't let the app do it). Only the title goes to the app. Nothing
   is fetched without that button.
+- Reminders of events and tasks are shown as notifications of the computer (with `notify-send`, or
+  D-Bus), also while the window is closed, as long as the server runs (the service does from when you
+  log in). For that, the app hands the server the reminders of the next two weeks: their titles,
+  times and places, which it keeps in `reminders.json` in the install directory (readable only by
+  you) until they're shown, and empties when you log out. A reminder missed while the computer was
+  asleep is shown when it wakes, if it's at most an hour late. Calendars you hide don't remind.
 - Notes, events, tasks and contacts you have opened stay available offline, but the browser needs the
   server running to load the app.
 

@@ -27,8 +27,9 @@ import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./da
 import { useDateFormats } from "./format";
 import { sameDay } from "./occurrences";
 import { RepeatChoiceDialog } from "./Dialogs";
+import { Reminder, reminderKey, remindersOf, setReminders } from "./reminders";
 import { addSeconds, bumpSequence, changeOccurrence, excludeOccurrence, findOccurrence, hasChangedTimes, moveTime, updateSeries } from "./recurrence";
-import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, RepeatKey, repeatKeyOf, RepeatPicker, TimezonePicker, timezoneName, toDateString, toTimeString } from "./widgets";
+import { AccentButton, applyRepeat, CollectionPicker, DateTimeInput, Field, FieldInput, fromDateTimeStrings, pimStyles, ReminderPicker, RepeatKey, repeatKeyOf, RepeatPicker, TimezonePicker, timezoneName, toDateString, toTimeString } from "./widgets";
 
 interface PropsType {
   route: RouteProp<RootStackParamList, "EventEdit">;
@@ -64,6 +65,7 @@ interface FormValues {
   timezone: string;
   location: string;
   repeat: RepeatKey;
+  reminders: string;
   attendees: string;
   description: string;
 }
@@ -95,6 +97,7 @@ export default function EventEditScreen(props: PropsType) {
   const [endTime, setEndTime] = React.useState(`${String(Math.min(startHour + 1, 23)).padStart(2, "0")}:${(startHour === 23) ? "59" : "00"}`);
   const [location, setLocation] = React.useState("");
   const [repeat, setRepeat] = React.useState<RepeatKey>("none");
+  const [reminders, setRemindersState] = React.useState<Reminder[]>([]);
   // Who's invited (from a contact's "Schedule", they are)
   const [attendees, setAttendeesState] = React.useState<AttendeeEntry[]>(() => (attendeeName) ? [{ name: attendeeName, email: attendeeEmail }] : []);
   // The time zone the times are in (the device's, unless the event is in another one)
@@ -143,6 +146,7 @@ export default function EventEditScreen(props: PropsType) {
         timezone: (known) ? zone! : timezone,
         location: item.location ?? "",
         repeat: repeatKeyOf(existing.isRecurring() ? existing.rrule : null),
+        reminders: remindersOf(item.component).map(reminderKey).join("\n"),
         attendees: JSON.stringify(attendeesOf(item.component)),
         description: item.description ?? "",
       };
@@ -156,6 +160,7 @@ export default function EventEditScreen(props: PropsType) {
       setTimezone(values.timezone);
       setLocation(values.location);
       setRepeat(values.repeat);
+      setRemindersState(remindersOf(item.component));
       setAttendeesState(JSON.parse(values.attendees));
       setDescription(values.description);
       setInitial(values);
@@ -232,7 +237,7 @@ export default function EventEditScreen(props: PropsType) {
     setChoice(undefined);
     // What was changed in the form (all of it, for a new event). Only that is changed in the event,
     // so the times of a repeating event that were changed on their own keep what they have.
-    const values: FormValues = { title, calendar, allDay, startDate, startTime, endDate, endTime, timezone, location, repeat, attendees: JSON.stringify(attendees), description };
+    const values: FormValues = { title, calendar, allDay, startDate, startTime, endDate, endTime, timezone, location, repeat, reminders: reminders.map(reminderKey).join("\n"), attendees: JSON.stringify(attendees), description };
     const changed = (key: keyof FormValues) => !existing || !initial || (values[key] !== initial[key]);
     const timesChanged = (["allDay", "startDate", "startTime", "endDate", "endTime", "timezone"] as const).some(changed);
     const apply = (x: ICAL.Event) => {
@@ -247,6 +252,9 @@ export default function EventEditScreen(props: PropsType) {
       }
       if (changed("attendees")) {
         setAttendees(x.component, attendees);
+      }
+      if (changed("reminders")) {
+        setReminders(x.component, reminders);
       }
     };
 
@@ -386,6 +394,9 @@ export default function EventEditScreen(props: PropsType) {
             When it repeats in another way, the times of it that were changed or deleted on their own are as the new rule makes them.
           </Text>
         )}
+        <Field label="Reminders">
+          <ReminderPicker value={reminders} onChange={setRemindersState} allDay={allDay} />
+        </Field>
         <Field label="Attendees">
           <AttendeesField value={attendees} onChange={setAttendeesState} />
         </Field>

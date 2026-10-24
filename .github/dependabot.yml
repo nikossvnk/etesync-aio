@@ -1,0 +1,47 @@
+# Opens pull requests to update the dependencies. No workflow checks pull requests here yet, so
+# try an update before merging it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # Expo decides the versions of these, so they are updated together with Expo, by hand
+      # (npx expo install --fix): on their own they would break the app
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "babel-preset-expo"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "@types/react"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-gesture-handler"
+      - dependency-name: "react-native-get-random-values"
+      - dependency-name: "react-native-reanimated"
+      - dependency-name: "react-native-safe-area-context"
+      - dependency-name: "react-native-screens"
+      - dependency-name: "react-native-web"
+      - dependency-name: "@react-native-async-storage/async-storage"
+      - dependency-name: "@react-native-community/netinfo"
+      # patches/ changes it, and the patch is for this version
+      - dependency-name: "react-native-sodium"
+
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: monthly
+    groups:
+      e2e:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

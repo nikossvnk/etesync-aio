@@ -41,6 +41,10 @@ jobs:
   # The browser tests of e2e/, against a test server of our own
   e2e:
     runs-on: ubuntu-latest
+    env:
+      # The tests are written for a time zone with summer time; in UTC the app saves the times of
+      # events without a time zone
+      TZ: Europe/Berlin
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

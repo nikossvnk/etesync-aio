@@ -9,11 +9,12 @@ They change the data of the test account, so never point them at a real server o
 
 ## Running them
 
-1. An Etebase test server that allows signing up, e.g. the `test-server` image of the Etebase server
+1. An Etebase test server that allows signing up, e.g. the `test-server` image of our Etebase server
    (`docker/test-server` in its repository), on `http://127.0.0.1:3735`:
 
    ```
-   docker run -d --name etebase-test -p 127.0.0.1:3735:3735 etesync/test-server
+   docker build -t etebase-test-server -f docker/test-server/Dockerfile https://github.com/nikossvnk/etesync-server.git
+   docker run -d --name etebase-test -p 127.0.0.1:3735:3735 etebase-test-server
    ```
 
 2. The web build of the app, served on `http://localhost:8765`:

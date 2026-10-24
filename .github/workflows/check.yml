@@ -37,3 +37,54 @@ jobs:
 
       - name: Test
         run: npm test
+
+  # The browser tests of e2e/, against a test server of our own
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            e2e/package-lock.json
+
+      # Built from our own copy of the Etebase server, not from EteSync's images
+      - name: Start an Etebase test server
+        run: |
+          docker build -t etebase-test-server -f docker/test-server/Dockerfile --build-arg ETESYNC_VERSION=master \
+            https://github.com/nikossvnk/etesync-server.git#master
+          docker run -d --name etebase-test -p 127.0.0.1:3735:3735 etebase-test-server
+
+      - run: npm ci --no-audit --no-fund
+
+      - run: npm ci --no-audit --no-fund
+        working-directory: e2e
+
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+        working-directory: e2e
+
+      - name: Build the web app
+        run: npx expo export --platform web --output-dir web-build
+
+      - name: Wait for the test server
+        run: timeout 120 sh -c 'until curl -sf -o /dev/null http://127.0.0.1:3735/api/v1/authentication/is_etebase/; do sleep 2; done'
+
+      - name: Run the tests
+        working-directory: e2e
+        run: |
+          node serve.js &
+          node setup.js
+          node run.js
+
+      - name: Show the logs of the test server
+        if: failure()
+        run: docker logs etebase-test
+

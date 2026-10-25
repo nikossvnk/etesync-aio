@@ -51,6 +51,7 @@ const stubs = {
     AppState: { currentState: "active", addEventListener: () => ({ remove: () => undefined }) },
   }),
   "react-native-paper": nothing(),
+  "@expo/vector-icons/MaterialCommunityIcons": nothing(),
   "expo-secure-store": nothing(),
   "localforage": asModule(storage),
   "@react-native-async-storage/async-storage": { __esModule: true, default: undefined },

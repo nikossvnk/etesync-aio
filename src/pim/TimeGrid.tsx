@@ -38,9 +38,15 @@ interface Placed {
   columns: number;
 }
 
+// Where a time is in the hours of a day, in minutes from its top. The hours are those of the clock,
+// so on the days the clocks change (of 23 or 25 hours) it's not the time since midnight.
+function clockMinutes(date: Date, day: Date) {
+  return (date >= addDays(day, 1)) ? dayMinutes : date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+}
+
 // Events at the same time are next to each other: each one gets the first column that is free at its
 // start, and a group of events that overlap is divided into as many columns as it needs
-function placeEvents(occurrences: Occurrence[], day: Date): Placed[] {
+export function placeEvents(occurrences: Occurrence[], day: Date): Placed[] {
   const sorted = [...occurrences].sort((a, b) => (a.start.getTime() - b.start.getTime()) || (b.end.getTime() - a.end.getTime()));
   const ret: Placed[] = [];
   let group: Placed[] = [];
@@ -67,8 +73,9 @@ function placeEvents(occurrences: Occurrence[], day: Date): Placed[] {
       columnEnds[column] = end;
     }
     groupEnd = (group.length) ? Math.max(groupEnd, end) : end;
-    const minutes = (occurrence.start.getTime() - day.getTime()) / 60000;
-    const length = (end - start) / 60000;
+    const minutes = clockMinutes(occurrence.start, day);
+    // (at least a quarter of an hour, also when the clocks went back during it)
+    const length = Math.max(clockMinutes(new Date(end), day) - minutes, 15);
     const placed = {
       occurrence,
       top: minutes / 60 * hourHeight,

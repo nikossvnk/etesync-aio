@@ -62,8 +62,10 @@ run(async () => {
   const took = Date.now() - started;
   check("the import says they were imported", (await done.innerText()).includes(`${count} items imported`), await dialog.innerText());
   console.log(`(importing ${count} contacts took ${took} ms)`);
-  // (about 6 s when each contact was a change of the store of its own, now about 2 s)
-  check("importing them took less than 4 seconds", took < 4000, `${took} ms`);
+  // (about 6 s when each contact was a change of the store of its own, now about 2 s; GitHub's
+  // machines are slower, about 5 s now, so the limit there is higher)
+  const limit = process.env.CI ? 10 : 4;
+  check(`importing them took less than ${limit} seconds`, took < limit * 1000, `${took} ms`);
 
   const contacts = await collectionOf(etebase, types.contacts);
   let onServer = [];

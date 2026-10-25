@@ -253,16 +253,17 @@ run(async () => {
   check("at its time, as long as it is", Math.abs(box.y - slot10.y) < 4 && Math.abs(box.height - 22) < 4, { box, slot10 });
   check("and a line at the current time", await grid.locator('[data-testid="now-line"]').count() === 1);
 
-  // Choosing an empty hour makes an event then
-  await grid.getByRole("button", { name: /^New event .* 15:00$/ }).nth((today.getDay() + 6) % 7).click(); await wait(2000);
-  check("an event made from an hour starts then", (await vis('input[aria-label="Start time"]').inputValue()) === "15:00" &&
-    (await vis('input[aria-label="End time"]').inputValue()) === "16:00" &&
+  // Choosing an empty hour makes an event then (11:00 is free on any day: the call to New York is at 15:00 or 16:00 here,
+  // depending on whether the clocks of both have changed)
+  await grid.getByRole("button", { name: /^New event .* 11:00$/ }).nth((today.getDay() + 6) % 7).click(); await wait(2000);
+  check("an event made from an hour starts then", (await vis('input[aria-label="Start time"]').inputValue()) === "11:00" &&
+    (await vis('input[aria-label="End time"]').inputValue()) === "12:00" &&
     (await vis('input[aria-label="Start date"]').inputValue()) === ukDate(today));
   await vis('input[aria-label="Title"]').fill(`Week event ${n}`);
   await btn(/^save$/i).click(); await wait(3000);
   check("it's shown in the week", await grid.getByRole("button", { name: `Event Week event ${n}` }).count() === 1);
   check("and is on the server", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => (
-    c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T150000`).test(c)
+    c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T110000`).test(c)
   )))));
 
   // Dragging an event an hour down moves it an hour later, dragging its lower edge changes its end
@@ -278,7 +279,7 @@ run(async () => {
   const weekEvent = () => grid.getByRole("button", { name: `Event Week event ${n}` });
   await drag(weekEvent(), 48);
   check("dragging an event moves it to another time, on the server", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => (
-    c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T160000`).test(c) && new RegExp(`DTEND[^:]*:${icalDate(today)}T170000`).test(c)
+    c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T120000`).test(c) && new RegExp(`DTEND[^:]*:${icalDate(today)}T130000`).test(c)
   )))), serverDetail(types.calendar)());
   const end = weekEvent().locator('[data-testid="time-grid-resize"]');
   const endBox = await end.boundingBox();
@@ -288,7 +289,7 @@ run(async () => {
   }
   await p.mouse.up(); await wait(3000);
   check("dragging its lower edge changes when it ends", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) && x.contents.some((c) => (
-    c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T160000`).test(c) && new RegExp(`DTEND[^:]*:${icalDate(today)}T173000`).test(c)
+    c.includes(`SUMMARY:Week event ${n}`) && new RegExp(`DTSTART[^:]*:${icalDate(today)}T120000`).test(c) && new RegExp(`DTEND[^:]*:${icalDate(today)}T133000`).test(c)
   )))), serverDetail(types.calendar)());
 
   // The all day row has the trip as a bar, and its details have its days

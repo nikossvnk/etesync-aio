@@ -31,7 +31,7 @@
     "expo-secure-store": "~57.0.4",
     "expo-updates": "~57.0.0",
     "fflate": "^0.8.3",
-    "highlight-words-core": "^1.2.0",
+    "highlight-words-core": "^2.0.0",
     "ical.js": "^1.5.0",
     "immutable": "^5.0.0",
     "localforage": "^1.10.0",

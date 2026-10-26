@@ -25,7 +25,8 @@ import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
 import {
   allTags, Bookmark, BookmarkData, bookmarksFrom, bookmarksSelector, bookmarkTitle, comparableUrl, createBookmark, deleteBookmark,
-  domainOf, fetchTitle, findUrl, isValidUrl, normalizeTag, normalizeUrl, restoreBookmark, savedFromLabel, siteLetter, tagBookmarks, updateBookmark,
+  domainOf, enteredUrl, fetchTitle, findUrl, isValidUrl, normalizeTag, normalizeUrl, restoreBookmark, savedFromLabel, siteLetter, tagBookmarks,
+  updateBookmark, withoutTracking,
 } from "../bookmarks";
 import { usePimCollections } from "./data";
 import { CollectionPicker, EmptyState } from "./widgets";
@@ -254,7 +255,7 @@ function BookmarkPanel(props: PanelProps) {
   const fmt = useDateFormats();
   const lists = usePimCollections(C.bookmarkColType);
   const { bookmark } = props;
-  const [url, setUrl] = React.useState(bookmark?.url ?? props.initialUrl ?? "");
+  const [url, setUrl] = React.useState(bookmark?.url ?? withoutTracking(props.initialUrl ?? ""));
   const [title, setTitle] = React.useState(bookmark?.title ?? "");
   const [note, setNote] = React.useState(bookmark?.note ?? "");
   const [tags, setTags] = React.useState(bookmark?.tags ?? []);
@@ -371,7 +372,7 @@ function BookmarkPanel(props: PanelProps) {
         <DialogInput
           value={url}
           onChangeText={(x) => {
-            setUrl(x);
+            setUrl((was) => enteredUrl(was, x));
             setError(undefined);
           }}
           onSubmitEditing={save}

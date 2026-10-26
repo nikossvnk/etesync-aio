@@ -161,13 +161,72 @@ export function isValidUrl(url: string) {
 }
 
 // The link for comparing, to find out whether it was saved already: "https://Example.com/a/" and
-// "http://example.com/a" are the same page
+// "http://example.com/a" are the same page, and so is "https://example.com/a?utm_source=news"
 export function comparableUrl(url: string) {
-  return normalizeUrl(url)
+  return normalizeUrl(withoutTracking(url))
     .replace(/^https?:\/\/(www\.)?/i, "")
     .replace(/#.*$/, "")
     .replace(/\/+$/, "")
     .replace(/^[^/?]+/, (host) => host.toLowerCase());
+}
+
+// Query parameters that only tell a site where a visit came from (ads, newsletters, shares), on any
+// site: the name, or its beginning when it ends with "*". Only well-known ones, since a parameter
+// that's removed by mistake can break the link.
+const trackingParams = [
+  "utm_*", "fbclid", "gclid", "gclsrc", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "twclid",
+  "ttclid", "li_fat_id", "epik", "rb_clickid", "igshid", "igsh", "mc_cid", "mc_eid", "mkt_tok",
+  "_hsenc", "_hsmi", "__hssc", "__hstc", "__hsfp", "hsctatracking", "oly_anon_id", "oly_enc_id",
+  "vero_conv", "vero_id", "wickedid", "_openstat", "_ga", "_gl",
+];
+
+// Ones that track shares on some sites only (and may mean something else elsewhere)
+const trackingParamsOf: { [host: string]: string[] } = {
+  "youtube.com": ["si", "feature"],
+  "music.youtube.com": ["si", "feature"],
+  "youtu.be": ["si", "feature"],
+  "open.spotify.com": ["si"],
+  "x.com": ["s", "t"],
+  "twitter.com": ["s", "t"],
+};
+
+function isTracking(name: string, host: string) {
+  const matches = (x: string) => (x.endsWith("*")) ? name.startsWith(x.slice(0, -1)) : (name === x);
+  return trackingParams.some(matches) || (trackingParamsOf[host] ?? []).some(matches);
+}
+
+// A web link without its tracking parameters (e.g. "?utm_source=newsletter"). The rest of it is kept
+// exactly as it was (it's not parsed and written again, which could change how it's encoded).
+export function withoutTracking(url: string) {
+  const ret = url.trim();
+  const match = /^([^?#]*)\?([^#]*)(#.*)?$/.exec(ret);
+  if (!match || !/^https?:/i.test(normalizeUrl(ret))) {
+    return url;
+  }
+  const [, base, query, hash] = match;
+  const host = domainOf(normalizeUrl(ret)).replace(/^m\./, "");
+  const params = query.split("&");
+  const kept = params.filter((x) => {
+    let name = x.split("=")[0];
+    try {
+      name = decodeURIComponent(name.replace(/\+/g, " "));
+    } catch {
+      // (an invalid escape, which is compared as it is)
+    }
+    return !isTracking(name.toLowerCase(), host);
+  });
+  if (kept.length === params.length) {
+    return url;
+  }
+  const rest = kept.filter((x) => x !== "").join("&");
+  return base + ((rest) ? `?${rest}` : "") + (hash ?? "");
+}
+
+// The link in a field after it was changed: one that's pasted (more than a letter at once) is
+// without its tracking parameters right away, so that the link that's saved is the one seen. (While
+// it's typed, it's left alone.)
+export function enteredUrl(before: string, after: string) {
+  return (after.length > before.length + 1) ? withoutTracking(after) : after;
 }
 
 // A web link in a text, e.g. what's pasted or dropped, which is often the title and then the link
@@ -221,7 +280,7 @@ export function metaOf(data: BookmarkData, created: number, savedFrom?: SavedFro
   return {
     name: data.title.trim(),
     mtime: (new Date()).getTime(),
-    url: normalizeUrl(data.url),
+    url: normalizeUrl(withoutTracking(data.url)),
     description: data.note.trim() || undefined,
     tags: (tags.length > 0) ? tags : undefined,
     created,

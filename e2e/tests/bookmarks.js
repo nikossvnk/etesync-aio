@@ -1,5 +1,5 @@
 // Bookmarks on wide screens: the section of the sidebar with the bookmark lists, saving a link by
-// pasting it (its title is read from the page only with "Get title"), copying a link, where it was saved from, the list (search, tags, several at once: moving,
+// pasting it (its title is read from the page only with "Get title"), taking tracking parameters out of links, copying a link, where it was saved from, the list (search, tags, several at once: moving,
 // tagging, deleting), the panel to edit one, deleting with undo, importing a browser's bookmark file,
 // exporting a list, and the bookmark lists in Settings → Collections and the New collection dialog.
 // What's done is checked on the server. It uses an account of its own (made for each run).
@@ -141,6 +141,26 @@ run(async () => {
   await panel.getByRole("button", { name: "Save bookmark" }).click(); await wait(2500);
   check("a new one from the panel is saved in the chosen list", await waitFor(async () => (await lists(etebase)).some((l) => (l.name === "Work links") &&
     l.bookmarks.some((x) => (x.url === `https://example.com/manual-${n}`) && (x.name === `Manual ${n}`)))));
+
+  // Tracking parameters are taken out of links: of pasted ones at once, and of typed ones on saving
+  const tracked = `https://example.com/tracked-${n}`;
+  await vis('input[aria-label="Paste a link to save it"]').fill(`${tracked}?utm_source=news&id=7&fbclid=IwAR0x#part`);
+  await vis('input[aria-label="Paste a link to save it"]').press("Enter");
+  check("a pasted link is saved without its tracking parameters", await waitFor(async () => (await lists(etebase)).some((l) => l.bookmarks.some((x) => (x.url === `${tracked}?id=7#part`) && (x.content === `${tracked}?id=7#part`)))),
+    (await lists(etebase)).flatMap((l) => l.bookmarks).map((x) => x.url));
+  await vis('input[aria-label="Paste a link to save it"]').fill(`${tracked}?id=7&utm_campaign=autumn`);
+  await vis('input[aria-label="Paste a link to save it"]').press("Enter"); await wait(2500);
+  check("the same link with other tracking parameters is the same bookmark", (await lists(etebase)).flatMap((l) => l.bookmarks).filter((x) => x.url.startsWith(tracked)).length === 1);
+  await vis('input[aria-label="Paste a link to save it"]').fill("");
+  await p.getByRole("button", { name: "New bookmark", exact: true }).click(); await wait(800);
+  await panel.locator('input[aria-label="Link"]').fill(`https://example.com/pasted-${n}?gclid=1&page=2`);
+  check("pasting into the panel's field takes them out there", (await panel.locator('input[aria-label="Link"]').inputValue()) === `https://example.com/pasted-${n}?page=2`);
+  await panel.locator('input[aria-label="Link"]').fill("");
+  await panel.locator('input[aria-label="Link"]').pressSequentially(`https://example.com/typed-${n}?utm_term=x`);
+  check("typing one leaves it as it's typed", (await panel.locator('input[aria-label="Link"]').inputValue()) === `https://example.com/typed-${n}?utm_term=x`);
+  await panel.locator('input[aria-label="Title"]').fill(`Typed ${n}`);
+  await panel.getByRole("button", { name: "Save bookmark" }).click();
+  check("and saving it takes them out", await waitFor(async () => (await lists(etebase)).some((l) => l.bookmarks.some((x) => (x.name === `Typed ${n}`) && (x.url === `https://example.com/typed-${n}`)))));
 
   // Search, tags and the lists
   await vis('input[aria-label="Search bookmarks"]').fill("spreewald");

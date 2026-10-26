@@ -68,6 +68,43 @@ More options (port, browser) and how releases are made are in `desktop/README.md
 - `src/pim/`: the new screens, `data.ts` (reading and saving items through the notes' offline
   queue) and the model from etesync-web.
 
+### The stored data
+
+The browser keeps the app's data in its local storage for the app's address (DevTools →
+Application → Local storage → `http://localhost:8092`), in four entries:
+
+| Key | What's in it |
+|---|---|
+| `persist:cache` | Every synced collection and item |
+| `persist:sync` | The changes not uploaded yet, and where the last sync stopped |
+| `persist:settings` | The view settings |
+| `persist:credentials` | The login (with the account's keys, don't share it) |
+
+Each of their fields is JSON in a JSON string. This, in the console, shows one as an object:
+
+```js
+const read = (k) => { const o = JSON.parse(localStorage.getItem("persist:" + k)); for (const x in o) { try { o[x] = JSON.parse(o[x]); } catch {} } return o; };
+const cache = read("cache");
+// The collections by type (etebase.md.note, etebase.vevent, etebase.vtodo, etebase.vcard, etebase.bookmark)
+Object.values(cache.collections).reduce((r, c) => ((r[c.collectionType] ??= []).push(c.meta.name), r), {});
+```
+
+The cache is grouped by collection, not by type:
+
+```
+collections: { "<collection UID>": { collectionType, meta, cache } }
+items:       { "<collection UID>": { "<item UID>": { meta, isDeleted, cache } } }
+```
+
+On the server everything is encrypted, the collection type too (the server has a keyed hash of
+it, so that it can list the collections of a type without knowing which type it is). When syncing,
+the app keeps `cache` as it came, encrypted (Etebase's `cacheSave`, which also has the meta), and
+next to it the decrypted `meta` and `collectionType` (`src/store/actions.ts`), so that the lists,
+the search and sorting don't decrypt every item. The contents (a note's Markdown, an event's
+iCalendar, a contact's vCard) are only decrypted in memory, when they're needed. The login in
+`persist:credentials` isn't encrypted with a key on the web (`src/sessionKey.web.ts`: a browser
+has no safe place for one), so whoever can read the browser profile can decrypt the rest.
+
 ## Security and privacy
 
 - **End-to-end encrypted.** Notes, events, tasks and contacts are encrypted on the device (by Etebase)

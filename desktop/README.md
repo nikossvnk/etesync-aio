@@ -92,7 +92,8 @@ every start):
   contacts to other sites: in Chromium translating, and the spell checking of Google's service (the
   browser's own spell checking still works); in Firefox its chatbot. Firefox translates on the
   computer, so only its offer to translate is off, and translating still works from its menu. Firefox
-  also gets no welcome pages, telemetry, daily usage ping or studies.
+  also gets no welcome pages, telemetry, daily usage ping or studies, and doesn't restore the old
+  tabs after it was ended abnormally (the app keeps its own data).
 - **Clearing your browser's data doesn't log you out**, nor remove changes that aren't synced yet.
 - The flags of `LOW_MEMORY` work in Chromium: the window runs in a browser of its own. (In the shared
   profile, a browser that runs already opens the window, without them.)

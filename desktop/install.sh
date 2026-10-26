@@ -40,7 +40,7 @@ remove_service() {
 }
 
 if [ "${1:-}" = "--uninstall" ]; then
-    if [ -d "$BASE/profile" ] && [ -t 0 ] && [ "${FORCE:-}" != "1" ]; then
+    if { [ -d "$BASE/profile" ] || [ -d "$BASE/profile-firefox" ]; } && [ -t 0 ] && [ "${FORCE:-}" != "1" ]; then
         echo "This also removes the window's browser profile, with the changes that aren't synced yet."
         printf "Sync in the app first (e.g. press Sync while online). Remove it? [y/N] "
         read -r answer
@@ -174,10 +174,10 @@ echo "EteSync Desktop $VERSION runs on $URL. Open it from the applications menu 
 echo "or with $BASE/etesync-desktop. An open window shows the new version after reloading it."
 if [ "$installed" = "yes" ] && [ -z "$had_profile" ] && [ "$PROFILE" = "own" ]; then
     echo
-    echo "The window now opens in a browser profile of its own, with Chromium-based browsers (without"
-    echo "your browser's extensions, and links open in your default browser), so log in again the first"
-    echo "time. The old login and data stay in your browser's usual profile: if the app was offline, open"
-    echo "$URL there to sync its changes, then log out there to remove them."
+    echo "The window now opens in a browser profile of its own (without your browser's extensions, and"
+    echo "links open in your default browser), so log in again the first time. The old login and data"
+    echo "stay in your browser's usual profile: if the app was offline, open $URL there to"
+    echo "sync its changes, then log out there to remove them."
     echo "To keep the old way: PROFILE=shared $BASE/install.sh"
 fi
 if [ "$service" = "no" ]; then

@@ -1,4 +1,4 @@
-# EteSync all-in-one (proof of concept)
+# EteSync all-in-one
 
 One app for notes, bookmarks, calendar, tasks and contacts on EteSync (Etebase), made from
 [etesync-notes](../etesync-notes) and [etesync-web](../etesync-web). It's a copy: the two projects
@@ -142,7 +142,7 @@ making and editing notebooks on phones (with the same dialog and page as the oth
 reminders of events and tasks (on the server, one made by another app, and the notifications the
 app hands to the local server).
 
-## Not done (it's a proof of concept)
+## Not done yet
 
 - Repeat rules other than daily, weekly, monthly and yearly (e.g. on some days of the week) can't
   be made in the app (they're kept as they are), and there's no "this and the following times".
@@ -151,7 +151,6 @@ app hands to the local server).
 - The history is there for notes and events, not yet for tasks, contacts and bookmarks, nor from a
   collection's changes (e.g. to bring back a deleted item).
 - Sharing calendars (members, invitations) uses what the notes have, which is made for notebooks.
-- Reminders, linking notes to events and tasks,
-  favourite contacts, a board view of the tasks (the designs have them, the data has nothing for them yet).
+- Linking notes to events and tasks, favourite contacts, a board view of the tasks (the designs have them, the data has nothing for them yet).
 - Licenses: etesync-notes is GPL-3.0 and etesync-web is AGPL-3.0. Files taken from etesync-web keep
   their AGPL-3.0 notice, and the combination has to follow the AGPL (both texts are in `LICENSES/`).

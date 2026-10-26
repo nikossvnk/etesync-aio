@@ -13,6 +13,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import Drawer from "./Drawer";
 import { useWebScrollbars } from "./webScrollbars";
 import SettingsGate from "./SettingsGate";
+import { setupExternalLinks } from "./externalLinks";
 
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-gesture-handler";
@@ -30,6 +31,8 @@ import { IBMPlexSans_600SemiBold } from "@expo-google-fonts/ibm-plex-sans/600Sem
 import { IBMPlexSans_700Bold } from "@expo-google-fonts/ibm-plex-sans/700Bold";
 
 enableScreens();
+// (in the installed app, links to other sites open in the default browser)
+setupExternalLinks();
 
 const DrawerNavigation = createDrawerNavigator();
 

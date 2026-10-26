@@ -5,11 +5,12 @@
 # without installing anything, run ./etesync-desktop in the unpacked release instead.)
 #
 #   ./install.sh                      # install, or update
-#   ./install.sh --uninstall          # remove it again
+#   ./install.sh --uninstall          # remove it again (FORCE=1: without asking)
 #   SERVICE=no ./install.sh           # without the service: the shortcut starts the server
 #   PORT=8093 ./install.sh            # another port (default 8092, or the one it's installed on)
 #   BROWSER=chromium ./install.sh     # the browser the shortcut opens (default: found when opening it)
 #   LOW_MEMORY=0 ./install.sh         # without the flags that make Chromium-based browsers use less memory
+#   PROFILE=shared ./install.sh       # open it in the browser's usual profile (default: own, a profile of its own)
 #
 # What it does, all in your home directory (nothing needs root):
 #   1. Copies the app to ~/.local/share/etesync-aio-web
@@ -39,13 +40,23 @@ remove_service() {
 }
 
 if [ "${1:-}" = "--uninstall" ]; then
+    if [ -d "$BASE/profile" ] && [ -t 0 ] && [ "${FORCE:-}" != "1" ]; then
+        echo "This also removes the window's browser profile, with the changes that aren't synced yet."
+        printf "Sync in the app first (e.g. press Sync while online). Remove it? [y/N] "
+        read -r answer
+        case "$answer" in
+            y|Y|yes) ;;
+            *) echo "Nothing was removed"; exit 1 ;;
+        esac
+    fi
     step "Removing EteSync Desktop"
     remove_service
     [ -x "$BASE/etesync-desktop" ] && "$BASE/etesync-desktop" --stop > /dev/null || true
     rm -f "$APPS_DIR/etesync-aio-web.desktop" "$DESKTOP_DIR/etesync-aio-web.desktop"
     rm -rf "$BASE"
-    echo "Removed. The browser still has the login and the synced data for the app's address, until"
-    echo "you clear that site's data in it (logging out in the app before removing it does that too)."
+    echo "Removed, with the app window's own browser profile. A browser it was opened in with"
+    echo "PROFILE=shared (or by its address) still has the login and the synced data for the app's"
+    echo "address, until you clear that site's data in it (logging out in the app before removing it does that too)."
     exit 0
 fi
 
@@ -61,9 +72,13 @@ VERSION="$(cat "$HERE/VERSION")"
 
 # What's not given stays as it's installed: the port above all, as the browser keeps the login per
 # address (a new port means logging in again)
-given_port="${PORT:-}" given_browser="${BROWSER:-}" given_low_memory="${LOW_MEMORY:-}"
+given_port="${PORT:-}" given_browser="${BROWSER:-}" given_low_memory="${LOW_MEMORY:-}" given_profile="${PROFILE:-}"
+installed=no
+[ -f "$BASE/VERSION" ] && installed=yes
 # shellcheck source=/dev/null
 [ -f "$BASE/settings" ] && . "$BASE/settings"
+# (installed by a version without it, which opened the window in the browser's usual profile)
+had_profile="${PROFILE:-}"
 if [ -z "$given_port" ] && [ -z "${PORT:-}" ] && [ -f "$UNIT" ]; then
     # (installed by a version that kept the port only in the service)
     PORT="$(sed -n 's/.*--port \([0-9]\+\).*/\1/p' "$UNIT" | head -n 1)"
@@ -71,7 +86,14 @@ fi
 PORT="${given_port:-${PORT:-8092}}"
 BROWSER="${given_browser:-${BROWSER:-}}"
 LOW_MEMORY="${given_low_memory:-${LOW_MEMORY:-1}}"
+PROFILE="${given_profile:-${PROFILE:-own}}"
+case "$PROFILE" in
+    own|shared) ;;
+    *) echo "PROFILE is own or shared" >&2; exit 1 ;;
+esac
 URL="http://localhost:$PORT"
+open_links=""
+[ "$PROFILE" = "own" ] && open_links=" --open-links"
 case "${SERVICE:-auto}" in
     yes|1) have_systemd || { echo "There's no systemd user session to run the service in (SERVICE=no installs it without)" >&2; exit 1; }
            service=yes ;;
@@ -93,7 +115,7 @@ rm -rf "$BASE/site.old" "$BASE/build.log" "$BASE/src" "$BASE/__pycache__"
 cp "$HERE/serve.py" "$HERE/etesync-desktop" "$HERE/install.sh" "$HERE/icon.png" "$HERE/VERSION" "$BASE/"
 {
     echo "# The settings install.sh was run with, used by etesync-desktop and by the next install"
-    printf 'PORT=%q\nBROWSER=%q\nLOW_MEMORY=%q\n' "$PORT" "$BROWSER" "$LOW_MEMORY"
+    printf 'PORT=%q\nBROWSER=%q\nLOW_MEMORY=%q\nPROFILE=%q\n' "$PORT" "$BROWSER" "$LOW_MEMORY" "$PROFILE"
 } > "$BASE/settings"
 
 if [ "$service" = "yes" ]; then
@@ -104,7 +126,7 @@ if [ "$service" = "yes" ]; then
 Description=EteSync Desktop, served on $URL (this computer only)
 
 [Service]
-ExecStart=$(command -v python3) $BASE/serve.py --port $PORT --dir $SITE --reminders $BASE/reminders.json
+ExecStart=$(command -v python3) $BASE/serve.py --port $PORT --dir $SITE --reminders $BASE/reminders.json$open_links
 Restart=on-failure
 
 [Install]
@@ -150,6 +172,14 @@ fi
 step "Done"
 echo "EteSync Desktop $VERSION runs on $URL. Open it from the applications menu or the desktop,"
 echo "or with $BASE/etesync-desktop. An open window shows the new version after reloading it."
+if [ "$installed" = "yes" ] && [ -z "$had_profile" ] && [ "$PROFILE" = "own" ]; then
+    echo
+    echo "The window now opens in a browser profile of its own, with Chromium-based browsers (without"
+    echo "your browser's extensions, and links open in your default browser), so log in again the first"
+    echo "time. The old login and data stay in your browser's usual profile: if the app was offline, open"
+    echo "$URL there to sync its changes, then log out there to remove them."
+    echo "To keep the old way: PROFILE=shared $BASE/install.sh"
+fi
 if [ "$service" = "no" ]; then
     echo "Without the service, the server keeps running in the background ($BASE/etesync-desktop --stop stops it)."
 fi

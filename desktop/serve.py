@@ -5,7 +5,9 @@ Paths that aren't files are answered with index.html, so that the app's own URLs
 also work when they are loaded directly. /bookmark-title reads the title of a web page for the
 bookmarks, which the browser doesn't let the app do itself. /reminders takes the notifications of the
 reminders of events and tasks that are due soon, which this shows as notifications of the computer
-when it's time (also while the app's window is closed). Installed and started by install.sh."""
+when it's time (also while the app's window is closed). With --open-links, /open-link opens links of
+the app in the computer's default browser (for when the app's window is in a browser profile of its
+own). Installed and started by install.sh."""
 import argparse
 import functools
 import html
@@ -176,6 +178,60 @@ def show_reminders(reminders, every):
         time.sleep(every)
 
 
+def valid_link(url):
+    """The link as it's opened, if it's a web, email or phone link (the ones the app opens), or None."""
+    if not isinstance(url, str) or not 0 < len(url) <= 8000 or re.search(r"[\x00-\x20\x7f]", url):
+        return None
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme.lower() in ("http", "https"):
+        return url if parts.netloc else None
+    return url if (parts.scheme.lower() in ("mailto", "tel")) and parts.path else None
+
+
+# What the desktop's session has (e.g. when the service was started before it), for the browser that
+# the link opens in
+SESSION_VARIABLES = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "DBUS_SESSION_BUS_ADDRESS")
+
+
+def session_environment():
+    env = dict(os.environ)
+    if (env.get("DISPLAY") or env.get("WAYLAND_DISPLAY")) or not shutil.which("systemctl"):
+        return env
+    try:
+        output = subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True, text=True, timeout=5, check=False).stdout
+    except (OSError, subprocess.SubprocessError):
+        return env
+    for line in output.splitlines():
+        name, _, value = line.partition("=")
+        if (name in SESSION_VARIABLES) and not env.get(name):
+            env[name] = value
+    return env
+
+
+def open_link(url):
+    """Opens the link in the computer's default browser (or mail or phone app), with xdg-open, or
+    else gio. (The link starts with its scheme, so neither takes it as an option.)"""
+    if shutil.which("xdg-open"):
+        command = ["xdg-open", url]
+    elif shutil.which("gio"):
+        command = ["gio", "open", url]
+    else:
+        print("Can't open a link: there's neither xdg-open nor gio", flush=True)
+        return False
+    try:
+        process = subprocess.Popen(command, env=session_environment(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError as e:
+        print(f"Can't open a link: {e}", flush=True)
+        return False
+    # (xdg-open can wait for the browser it started to be closed)
+    threading.Thread(target=process.wait, daemon=True).start()
+    return True
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     # Set by main(): the host names (with the port) that requests have to be for. Others are refused,
     # so that a web site can't reach this server through a DNS name it points to 127.0.0.1.
@@ -184,45 +240,100 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     server_version = "EteSyncDesktop"
     # Set by main()
     reminders = None
+    open_links = False
 
-    # Takes the notifications of the reminders that are due soon (they replace the ones it had). Only
-    # from the app, like /bookmark-title (a page of another site can't send this header, nor JSON).
-    def do_POST(self):
-        if self.path != "/reminders":
-            self.send_error(404, "Not Found")
-            return
-        if ((self.headers.get("Host", "").lower() not in self.allowed_hosts) or (self.headers.get("X-EteSync-Request") != "reminders")
-                or not self.headers.get("Content-Type", "").startswith("application/json")):
+    # Whether the request comes from the app: it's for this server's own name, and has the header (a
+    # page of another site can't send it without asking first, which this server doesn't allow)
+    def from_app(self, request):
+        return (self.headers.get("Host", "").lower() in self.allowed_hosts) and (self.headers.get("X-EteSync-Request") == request)
+
+    # The JSON the app sent, or None (after answering with an error)
+    def read_json(self):
+        if not self.headers.get("Content-Type", "").startswith("application/json"):
             self.send_error(403, "Forbidden")
-            return
+            return None
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = -1
         if not 0 < length <= 1000000:
             self.send_error(413 if length > 0 else 400, "Too long" if length > 0 else "Bad Request")
-            return
+            return None
         try:
-            notices = valid_notices(json.loads(self.rfile.read(length)).get("reminders"))
-        except (ValueError, AttributeError):
+            data = json.loads(self.rfile.read(length))
+        except ValueError:
+            data = None
+        if not isinstance(data, dict):
             self.send_error(400, "Bad Request")
-            return
-        self.reminders.replace(notices)
+            return None
+        return data
+
+    def send_no_content(self):
         self.send_response(204)
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
 
+    # Takes the notifications of the reminders that are due soon (they replace the ones it had), and
+    # opens links. Only from the app, like /bookmark-title (a page of another site can't send the
+    # header, nor JSON).
+    def do_POST(self):
+        if (self.path == "/open-link") and self.open_links:
+            self.open_link()
+            return
+        if self.path != "/reminders":
+            self.send_error(404, "Not Found")
+            return
+        if not self.from_app("reminders"):
+            self.send_error(403, "Forbidden")
+            return
+        data = self.read_json()
+        if data is None:
+            return
+        self.reminders.replace(valid_notices(data.get("reminders")))
+        self.send_no_content()
+
+    # Opens a link of the app ({"url": ...}) in the computer's default browser
+    def open_link(self):
+        if not self.from_app("open"):
+            self.send_error(403, "Forbidden")
+            return
+        data = self.read_json()
+        if data is None:
+            return
+        url = valid_link(data.get("url"))
+        if not url:
+            self.send_error(400, "Not a web, email or phone link")
+            return
+        if not open_link(url):
+            self.send_error(500, "Can't open links")
+            return
+        self.send_no_content()
+
     def do_GET(self):
         if self.path.startswith("/bookmark-title?"):
             self.bookmark_title()
+        elif self.path == "/open-link":
+            # (the app asks whether this server opens its links)
+            if not self.open_links:
+                self.send_error(404, "Not Found")
+                return
+            if not self.from_app("open"):
+                self.send_error(403, "Forbidden")
+                return
+            body = json.dumps({"enabled": True}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
         else:
             super().do_GET()
 
-    # Reads the title of the page of a bookmark (?url=...). Only for the app: the request has to be for
-    # this server's own name, and have a header that a page of another site can't send without asking
-    # first (which this server doesn't allow), so other sites can't make it fetch pages.
+    # Reads the title of the page of a bookmark (?url=...). Only for the app (see from_app()), so other
+    # sites can't make it fetch pages.
     def bookmark_title(self):
-        if (self.headers.get("Host", "").lower() not in self.allowed_hosts) or (self.headers.get("X-EteSync-Request") != "title"):
+        if not self.from_app("title"):
             self.send_error(403, "Forbidden")
             return
         url = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get("url", [""])[0]
@@ -271,10 +382,12 @@ def main():
     parser.add_argument("--port", type=int, default=8092)
     parser.add_argument("--dir", required=True, help="the web build to serve")
     parser.add_argument("--reminders", help="the file the reminders that are due soon are kept in (default: only in memory)")
+    parser.add_argument("--open-links", action="store_true", help="open the app's links in the default browser (/open-link)")
     parser.add_argument("--check-every", type=float, default=15, help=argparse.SUPPRESS)
     args = parser.parse_args()
     Handler.allowed_hosts = {f"localhost:{args.port}", f"127.0.0.1:{args.port}"}
     Handler.reminders = Reminders(args.reminders)
+    Handler.open_links = args.open_links
     threading.Thread(target=show_reminders, args=(Handler.reminders, args.check_every), daemon=True).start()
     handler = functools.partial(Handler, directory=args.dir)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), handler)

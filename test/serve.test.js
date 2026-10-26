@@ -1,7 +1,8 @@
 // The notifications of the reminders, shown by the app's local server (desktop/serve.py): it takes
 // them only from the app, shows each one when it's due with notify-send (here a stand-in that writes
 // down what it was given), once, also after the server was started again, and keeps them only
-// readable by the user.
+// readable by the user. With --open-links, it opens the app's links (only web, email and phone links)
+// with xdg-open (a stand-in too).
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
@@ -20,11 +21,12 @@ function setup() {
   fs.writeFileSync(path.join(dir, "site", "index.html"), "<!doctype html>");
   // (one line per notification, with its arguments as JSON)
   fs.writeFileSync(path.join(dir, "bin", "notify-send"), `#!/usr/bin/env python3\nimport json, sys\nopen(${JSON.stringify(path.join(dir, "shown"))}, "a").write(json.dumps(sys.argv[1:]) + "\\n")\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, "bin", "xdg-open"), `#!/usr/bin/env python3\nimport json, sys\nopen(${JSON.stringify(path.join(dir, "opened"))}, "a").write(json.dumps(sys.argv[1:]) + "\\n")\n`, { mode: 0o755 });
   return dir;
 }
 
-async function start(dir, port) {
-  const server = spawn("python3", [serve, "--port", String(port), "--dir", path.join(dir, "site"), "--reminders", path.join(dir, "reminders.json"), "--check-every", "0.2"],
+async function start(dir, port, options = []) {
+  const server = spawn("python3", [serve, "--port", String(port), "--dir", path.join(dir, "site"), "--reminders", path.join(dir, "reminders.json"), "--check-every", "0.2", ...options],
     { env: { ...process.env, PATH: `${path.join(dir, "bin")}:${process.env.PATH}` }, stdio: "ignore" });
   for (let i = 0; i < 50; i++) {
     try {
@@ -37,22 +39,27 @@ async function start(dir, port) {
   throw new Error("serve.py didn't start");
 }
 
-const shown = (dir) => (fs.existsSync(path.join(dir, "shown"))) ? fs.readFileSync(path.join(dir, "shown"), "utf8").trim().split("\n").map((x) => JSON.parse(x)) : [];
+const lines = (file) => (fs.existsSync(file)) ? fs.readFileSync(file, "utf8").trim().split("\n").map((x) => JSON.parse(x)) : [];
+const shown = (dir) => lines(path.join(dir, "shown"));
+const opened = (dir) => lines(path.join(dir, "opened"));
 
 // (with http, as fetch doesn't send another Host)
-function post(port, body, headers = {}) {
-  const data = JSON.stringify(body);
+function request(port, method, where, body, headers) {
+  const data = (body === undefined) ? "" : JSON.stringify(body);
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: "127.0.0.1", port, path: "/reminders", method: "POST",
-      headers: { Host: `localhost:${port}`, "Content-Type": "application/json", "X-EteSync-Request": "reminders", "Content-Length": Buffer.byteLength(data), ...headers } },
+    const req = http.request({ host: "127.0.0.1", port, path: where, method,
+      headers: { Host: `localhost:${port}`, ...((body === undefined) ? {} : { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) }), ...headers } },
     (res) => {
-      res.resume();
-      res.on("end", () => resolve({ status: res.statusCode }));
+      const chunks = [];
+      res.on("data", (x) => chunks.push(x));
+      res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString() }));
     });
     req.on("error", reject);
     req.end(data);
   });
 }
+const post = (port, body, headers = {}) => request(port, "POST", "/reminders", body, { "X-EteSync-Request": "reminders", ...headers });
+const openLink = (port, body, headers = {}) => request(port, "POST", "/open-link", body, { "X-EteSync-Request": "open", ...headers });
 
 test("the server shows the reminders the app hands it when they're due, once", async (t) => {
   const dir = setup();
@@ -95,4 +102,42 @@ test("the server shows the reminders the app hands it when they're due, once", a
   // Logging out empties them
   await post(port, { reminders: [] });
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, "reminders.json"), "utf8")).reminders, []);
+});
+
+test("with --open-links, the server opens the app's web, email and phone links in the default browser", async (t) => {
+  const dir = setup();
+  const port = 18000 + Math.floor(Math.random() * 1000);
+  let server = await start(dir, port);
+  t.after(() => {
+    server.kill();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Without it, there's no such thing (so the app opens links itself)
+  assert.equal((await request(port, "GET", "/open-link", undefined, { "X-EteSync-Request": "open" })).status, 404);
+  assert.equal((await openLink(port, { url: "https://example.com/" })).status, 404);
+  server.kill();
+  await sleep(300);
+  server = await start(dir, port, ["--open-links"]);
+
+  const asked = await request(port, "GET", "/open-link", undefined, { "X-EteSync-Request": "open" });
+  assert.equal(asked.status, 200);
+  assert.deepEqual(JSON.parse(asked.body), { enabled: true });
+  // Only from the app: with its header, for its own host name, and as JSON
+  assert.equal((await request(port, "GET", "/open-link", undefined, {})).status, 403);
+  assert.equal((await openLink(port, { url: "https://example.com/a" }, { "X-EteSync-Request": "" })).status, 403);
+  assert.equal((await openLink(port, { url: "https://example.com/b" }, { Host: "attacker.example.com" })).status, 403);
+  assert.equal((await openLink(port, { url: "https://example.com/c" }, { "Content-Type": "text/plain" })).status, 403);
+  // Only web, email and phone links, which can't be taken as options or files
+  for (const url of ["file:///etc/passwd", "--help", "/etc/passwd", "javascript:alert(1)", "https://example.com/a b", "https://", "mailto:", 42, ""]) {
+    assert.equal((await openLink(port, { url })).status, 400, String(url));
+  }
+  await sleep(500);
+  assert.deepEqual(opened(dir), []);
+
+  for (const url of ["https://en.wikipedia.org/wiki/Spreewald?a=1&b=2#x", "http://example.com/", "mailto:someone@example.com", "tel:+301234567"]) {
+    assert.equal((await openLink(port, { url })).status, 204, url);
+  }
+  await sleep(1000);
+  assert.deepEqual(opened(dir).sort(), [["http://example.com/"], ["https://en.wikipedia.org/wiki/Spreewald?a=1&b=2#x"], ["mailto:someone@example.com"], ["tel:+301234567"]]);
 });

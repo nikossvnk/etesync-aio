@@ -37,6 +37,7 @@ Options of `install.sh` (environment variables, also passed on by `get.sh`, e.g.
 | `PORT` | `8092` | The port on localhost. Changing it later means logging in again, as the browser keeps the login per address |
 | `BROWSER` | the first one found of Chromium, Chrome, Brave, Edge, Firefox | The browser the shortcut opens. Chromium-based browsers open it in an app window, Firefox in a new window |
 | `LOW_MEMORY` | `1` | Chromium-based browsers get flags that make them use a bit less memory (no spare page process, at most two, no background downloads, updates or sync); `0` leaves them out |
+| `PROFILE` | `own` | `own`: Chromium-based browsers open the window in a browser profile of its own (see below), and links open in your default browser. `shared`: in the browser's usual profile, with its extensions, and links open in that browser. Changing it means logging in again |
 
 `get.sh` also has `VERSION` (a given version instead of the latest) and `FORCE=1` (install it even
 when that version is installed already).
@@ -52,6 +53,7 @@ Everything is in your home directory, nothing needs root:
 | What | Where |
 |---|---|
 | The app, the server (`serve.py`, on 127.0.0.1 only), the launcher (`etesync-desktop`) and the settings | `~/.local/share/etesync-aio-web/` |
+| The window's browser profile, with `PROFILE=own` (the login and the synced data) | `~/.local/share/etesync-aio-web/profile/` |
 | The service, with `SERVICE=yes` | `~/.config/systemd/user/etesync-aio-web.service` |
 | The menu entry and the desktop shortcut, which run the launcher | `~/.local/share/applications/etesync-aio-web.desktop`, `~/Desktop/etesync-aio-web.desktop` |
 
@@ -70,10 +72,41 @@ It only builds committed changes (`ALLOW_DIRTY=1` to try it out with others). An
 has the web build (`site/`), `serve.py`, `etesync-desktop`, `install.sh`, the icon, `VERSION`, a
 `README.txt` with the commit it was made from, and the licences.
 
+## The window's own browser profile
+
+With `PROFILE=own` (the default), Chromium-based browsers open the window with a profile of its own
+(`--user-data-dir`, made the first time it's opened, readable only by you):
+
+- **No extensions** (`--disable-extensions`). An extension of your usual profile that may "read and
+  change data on all websites" could otherwise read the app's page, the login with the account's
+  keys included.
+- **The permissions the app doesn't use are turned off**: notifications (the reminders are the
+  computer's, shown by the server), location, camera, microphone, reading the clipboard (copying a
+  link still works), USB, serial, HID and Bluetooth devices, sensors, MIDI, and others. Saving
+  passwords and form data are off too, and so is what would send the decrypted notes, events and
+  contacts to Google: translating, and the spell checking of Google's service (the browser's own
+  spell checking still works).
+- **Clearing your browser's data doesn't log you out**, nor remove changes that aren't synced yet.
+- The flags of `LOW_MEMORY` work: the window runs in a browser of its own. (In the shared profile, a
+  browser that runs already opens the window, without them.)
+- **Links open in your default browser**, where you're logged in to their sites: the app hands
+  links to other sites (and email and phone links) to the server, which opens them with `xdg-open`.
+  It only takes them from the app (like the other requests, see below), and only web, email and phone
+  links. Opening a link from the right-click menu still opens it in the window's profile.
+
+It doesn't protect the login from programs that run as you: the profile is a directory in your
+home, like your browser's. With Firefox, the window opens in its usual profile either way.
+
+Changing between `own` and `shared` means logging in again: the login and the synced data are in
+the profile. When an update switches an install to `own`, the old ones stay in your browser's usual
+profile: if the app was offline before the update, open `http://localhost:8092` in that browser to
+sync what was changed, then log out there to remove them.
+
 ## Good to know
 
-- The login is kept in the browser's storage for `http://localhost:8092`. Anyone who can use your
-  browser profile can use the account, so only use it on your own computer.
+- The login is kept in the browser's storage for `http://localhost:8092` (in the window's own
+  profile, with `PROFILE=own`). Anyone who can use that browser profile can use the account, so only
+  use it on your own computer.
 - "Get title" of a bookmark makes the server fetch the page of its link, from this computer, to
   read its title (the browser doesn't let the app do it). Only the title goes to the app. Nothing
   is fetched without that button.
@@ -92,5 +125,8 @@ has the web build (`site/`), `serve.py`, `etesync-desktop`, `install.sh`, the ic
 ~/.local/share/etesync-aio-web/install.sh --uninstall
 ```
 
-It removes the service, the server, the app and the shortcuts. The browser keeps the login and the
-synced data for the app's address until you clear that site's data (or log out in the app first).
+It removes the service, the server, the app, the window's own profile (with the login and the synced
+data) and the shortcuts. Changes that aren't synced yet are lost with the profile, so sync first; it
+asks before removing it (`FORCE=1` doesn't). A browser the app was opened in with `PROFILE=shared` (or by its address)
+keeps the login and the synced data for the app's address until you clear that site's data (or log
+out in the app first).

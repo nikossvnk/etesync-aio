@@ -348,7 +348,8 @@ const Markdown = React.memo(function _Markdown(props: MarkdownPropsType) {
       mergeStyle
       onLinkPress={(url) => {
         openExternalUrl(url);
-        return true;
+        // (true would make it open the link again, itself, without checking it)
+        return false;
       }}
     >
       {content}

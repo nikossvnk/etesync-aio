@@ -129,6 +129,12 @@ has no safe place for one), so whoever can read the browser profile can decrypt 
   books and bookmark lists, and the bookmarks (their link, title, note and tags are their meta, as
   in EteSync Notes, so that they're listed without decrypting each one). Logging out removes all of it. A browser has no safe place for keys, so whoever can use the
   browser profile can use the account (see `desktop/README.md`).
+- **A browser profile of its own.** The installed app opens its window (in Chromium-based browsers) in
+  a profile of its own, without extensions (which could read the login) and with the permissions it
+  doesn't use turned off. Links to other sites open in the default browser instead: the app hands
+  them to the local server, which opens them with `xdg-open` (only web, email and phone links, and
+  only from the app). See `desktop/README.md`; `PROFILE=shared` opens it in the browser's usual
+  profile. `e2e/tests/open-links.js` checks that the window opens none of the links itself.
 - **Nothing in synced data runs as code.** Everything is shown as text (no HTML). Links from synced
   data (contacts' web sites, links in notes) are only opened when they are web, email or phone links.
   The local web server sends a Content-Security-Policy that only lets the app's own code run, keeps

@@ -1,6 +1,8 @@
 // Serves the web build of the app (default: ../web-build) on port 8765, with every unknown path
 // answered by index.html, so that the app's own URLs (e.g. /settings/about) work when loaded directly.
-// /bookmark-title reads the title of a web page, and /reminders takes the reminders, like desktop/serve.py does.
+// /bookmark-title reads the title of a web page, /reminders takes the reminders, and /open-link takes the
+// links to open in the default browser, like desktop/serve.py does (with --open-links, which the install
+// uses by default; OPEN_LINKS=0 leaves it out).
 const http = require("http"), fs = require("fs"), path = require("path");
 const root = path.resolve(process.argv[2] || path.join(__dirname, "..", "web-build"));
 const port = Number(process.env.PORT || 8765);
@@ -21,6 +23,9 @@ async function pageTitle(url) {
 // The reminders the app handed over last (POST /reminders, as desktop/serve.py takes them), which the
 // tests read with GET /reminders
 let reminders = null;
+// The links the app asked to open (POST /open-link), which the tests read with GET /opened-links
+const openedLinks = [];
+const openLinks = process.env.OPEN_LINKS !== "0";
 
 http.createServer(async (req, res) => {
   if (req.url === "/reminders") {
@@ -38,6 +43,32 @@ http.createServer(async (req, res) => {
     }
     reminders = JSON.parse(Buffer.concat(chunks).toString()).reminders;
     res.writeHead(204).end();
+    return;
+  }
+  if (req.url === "/open-link") {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    if (!openLinks) {
+      res.writeHead(404).end();
+    } else if (req.headers["x-etesync-request"] !== "open") {
+      res.writeHead(403).end();
+    } else if (req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ enabled: true }));
+    } else {
+      const url = JSON.parse(Buffer.concat(chunks).toString()).url;
+      if ((typeof url !== "string") || !/^(https?:\/\/[^/]|mailto:.|tel:.)/i.test(url)) {
+        res.writeHead(400).end();
+        return;
+      }
+      openedLinks.push(url);
+      res.writeHead(204).end();
+    }
+    return;
+  }
+  if (req.url === "/opened-links") {
+    res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(openedLinks));
     return;
   }
   if (req.url.startsWith("/bookmark-title?")) {

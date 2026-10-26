@@ -537,10 +537,10 @@ export default function Sidebar() {
   }
 
   const sections = [
-    { key: "notes", label: "Notes", icon: "file-document-outline", screen: "Home", count: notesCount },
-    { key: "bookmarks", label: "Bookmarks", icon: "bookmark-multiple-outline", screen: "Bookmarks", count: bookmarksCount },
     { key: "calendar", label: "Calendar", icon: "calendar-blank-outline", screen: "Calendar", count: (todays?.length) ? `${todays.length} today` : "" },
     { key: "tasks", label: "Tasks", icon: "checkbox-marked-circle-outline", screen: "Tasks", badge: dueCount },
+    { key: "notes", label: "Notes", icon: "file-document-outline", screen: "Home", count: notesCount },
+    { key: "bookmarks", label: "Bookmarks", icon: "bookmark-multiple-outline", screen: "Bookmarks", count: bookmarksCount },
     { key: "contacts", label: "Contacts", icon: "account-outline", screen: "Contacts" },
   ];
 

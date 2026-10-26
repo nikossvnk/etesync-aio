@@ -25,41 +25,6 @@ import { serverName } from "./helpers";
 import { RootStackParamList } from "./RootStackParamList";
 import { fonts, useTheme } from "./theme";
 
-type MenuItem = {
-  title: string;
-  path: keyof RootStackParamList;
-  icon: string;
-  link: string;
-};
-
-// The calendar, the tasks and the contacts, which are next to the notes
-const pimMenuItems: MenuItem[] = [
-  {
-    title: "Search all",
-    path: "SearchAll",
-    icon: "magnify",
-    link: "/search-all",
-  },
-  {
-    title: "Calendar",
-    path: "Calendar",
-    icon: "calendar-month-outline",
-    link: "/calendar",
-  },
-  {
-    title: "Tasks",
-    path: "Tasks",
-    icon: "checkbox-marked-circle-outline",
-    link: "/tasks",
-  },
-  {
-    title: "Contacts",
-    path: "Contacts",
-    icon: "account-box-outline",
-    link: "/contacts",
-  },
-];
-
 export const externalMenuItems = [
   {
     title: "Report issue",
@@ -172,10 +137,14 @@ export default function Drawer(props: PropsType) {
   }
 
   const items: { label: string, icon: string, screen: string, also?: string[] }[] = (loggedIn) ? [
+    // The sections in the order of the sidebar's (with the notebooks next to the notes)
+    { label: "Search all", icon: "magnify", screen: "SearchAll" },
+    { label: "Calendar", icon: "calendar-month-outline", screen: "Calendar" },
+    { label: "Tasks", icon: "checkbox-marked-circle-outline", screen: "Tasks" },
     { label: "Notes", icon: "file-document-outline", screen: "Home", also: ["NoteEdit", "NoteCreate", "Search"] },
-    { label: "Bookmarks", icon: "bookmark-multiple-outline", screen: "Bookmarks" },
     { label: "Notebooks", icon: "notebook-multiple", screen: "Notebooks", also: ["Collection"] },
-    ...pimMenuItems.map((x) => ({ label: x.title, icon: x.icon, screen: x.path })),
+    { label: "Bookmarks", icon: "bookmark-multiple-outline", screen: "Bookmarks" },
+    { label: "Contacts", icon: "account-box-outline", screen: "Contacts" },
     { label: "Settings", icon: "tune-variant", screen: "Settings" },
   ] : [
     { label: "Log in", icon: "login", screen: "Login" },

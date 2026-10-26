@@ -1,5 +1,5 @@
 // Bookmarks on wide screens: the section of the sidebar with the bookmark lists, saving a link by
-// pasting it (its title is read from the page only with "Get title"), where it was saved from, the list (search, tags, several at once: moving,
+// pasting it (its title is read from the page only with "Get title"), copying a link, where it was saved from, the list (search, tags, several at once: moving,
 // tagging, deleting), the panel to edit one, deleting with undo, importing a browser's bookmark file,
 // exporting a list, and the bookmark lists in Settings → Collections and the New collection dialog.
 // What's done is checked on the server. It uses an account of its own (made for each run).
@@ -59,7 +59,7 @@ run(async () => {
   const pageUrl = `http://127.0.0.1:${page.address().port}/article-${n}`;
 
   const b = await launch();
-  const A = await session(b, "A", { width: 1440, height: 900 });
+  const A = await session(b, "A", { width: 1440, height: 900 }, { permissions: ["clipboard-read", "clipboard-write"] });
   const { p, vis, wait } = A;
   await A.login({ username, password }, 9000);
   const sidebar = p.locator('[data-testid="sidebar"] >> visible=true');
@@ -80,7 +80,20 @@ run(async () => {
     return text.includes(`Spreewald ${n}`) && text.includes("en.wikipedia.org") && text.includes("Day trip") && text.includes("#travel") && /28 Sept?/.test(text);
   }), await list.innerText().catch(() => ""));
 
-  // Where a bookmark was saved from
+  // The buttons of a row: copying the link, opening it and deleting it, in that order
+  const actions = await list.locator(`[aria-label="Copy link of Spreewald ${n}"]`).evaluate((el) => {
+    // (the buttons are in the closest element that also has the delete button)
+    let box = el.parentElement;
+    while (!box.querySelector("[aria-label^='Delete ']")) {
+      box = box.parentElement;
+    }
+    return [...box.querySelectorAll("[aria-label]")].map((x) => x.getAttribute("aria-label")).filter((x) => /^(Copy link of|Open|Delete) /.test(x));
+  });
+  check("a row has the buttons copy link, open and delete, in that order", JSON.stringify(actions) === JSON.stringify([`Copy link of Spreewald ${n}`, `Open Spreewald ${n}`, `Delete Spreewald ${n}`]), actions);
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await list.getByRole("button", { name: `Copy link of Spreewald ${n}` }).click(); await wait(500);
+  check("copying puts the bookmark's link on the clipboard", (await p.evaluate(() => navigator.clipboard.readText())) === "https://en.wikipedia.org/wiki/Spreewald");
+
   await list.getByRole("button", { name: `Bookmark Spreewald ${n}` }).click(); await wait(800);
   check("the panel says where a bookmark was saved from", (await panel.locator('[data-testid="bookmark-saved"]').innerText()).includes("Saved 28 Sept 2026 from Android (Share)") ||
     (await panel.locator('[data-testid="bookmark-saved"]').innerText()).includes("Saved 28 Sep 2026 from Android (Share)"), await panel.locator('[data-testid="bookmark-saved"]').innerText());

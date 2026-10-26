@@ -331,15 +331,6 @@ function BookmarkPanel(props: PanelProps) {
     }
   }
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(normalizeUrl(url));
-      dispatch(pushMessage({ message: "Link copied", severity: "success" }) as any);
-    } catch (e) {
-      dispatch(pushMessage({ message: "The link couldn't be copied", severity: "error" }) as any);
-    }
-  }
-
   const edited = bookmark && (Math.abs(bookmark.mtime - bookmark.created) > 60 * 1000);
   const listOptions = lists.map((x) => ({ ...x }));
 
@@ -357,7 +348,7 @@ function BookmarkPanel(props: PanelProps) {
             </OpenLink>
             {(Platform.OS === "web") && (
               <IconButton icon="content-copy" size={16} accessibilityLabel="Copy link" iconColor={theme.colors.text} containerColor="transparent"
-                onPress={copy} style={[styles.iconButton, { borderColor: theme.colors.border, borderWidth: 1 }]} />
+                onPress={() => copyLink(dispatch, url)} style={[styles.iconButton, { borderColor: theme.colors.border, borderWidth: 1 }]} />
             )}
           </>
         )}
@@ -571,8 +562,19 @@ function BulkBar(props: { count: number, onMove: (colUid: string) => void, onTag
   );
 }
 
+// Copies the link to the clipboard (on the web)
+async function copyLink(dispatch: ReturnType<typeof useDispatch>, url: string) {
+  try {
+    await navigator.clipboard.writeText(normalizeUrl(url));
+    dispatch(pushMessage({ message: "Link copied", severity: "success" }) as any);
+  } catch (e) {
+    dispatch(pushMessage({ message: "The link couldn't be copied", severity: "error" }) as any);
+  }
+}
+
 function BookmarkRow(props: { bookmark: Bookmark, selected: boolean, checked: boolean, compact: boolean, fmt: DateFormats, onToggle: () => void, onPress: () => void, onDelete: () => void }) {
   const theme = useTheme();
+  const dispatch = useDispatch();
   const { bookmark, compact } = props;
   const title = bookmarkTitle(bookmark);
   const tags = <View style={[styles.tags, { gap: 6 }]}>{bookmark.tags.map((tag) => <Tag key={tag} tag={tag} />)}</View>;
@@ -595,6 +597,10 @@ function BookmarkRow(props: { bookmark: Bookmark, selected: boolean, checked: bo
       {!compact && <View style={styles.colTags}>{tags}</View>}
       {!compact && <View style={styles.colWhen}>{when}</View>}
       <View style={styles.rowActions}>
+        {(Platform.OS === "web") && (
+          <IconButton icon="content-copy" size={16} accessibilityLabel={`Copy link of ${title}`} iconColor={theme.colors.textMuted} containerColor="transparent"
+            onPress={() => copyLink(dispatch, bookmark.url)} style={{ margin: 0 }} />
+        )}
         <OpenLink url={bookmark.url} label={`Open ${title}`}>
           <View style={styles.rowAction}>
             <MaterialCommunityIcons name="open-in-new" size={17} color={theme.colors.textMuted} />
@@ -1043,7 +1049,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   rowActions: {
-    width: 76,
+    width: 112,
     flexDirection: "row",
     justifyContent: "flex-end",
     alignItems: "center",

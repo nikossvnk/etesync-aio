@@ -698,6 +698,8 @@ const styles = StyleSheet.create({
   viewerPressable: {
     flexGrow: 1,
     cursor: "text",
+    // Words longer than the line are broken, rather than making the note wider than the screen
+    wordBreak: "break-word",
   } as any,
   editorDesk: {
     flex: 1,

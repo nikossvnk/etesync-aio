@@ -49,11 +49,11 @@ export default function AboutScreen() {
         <Container>
           <Title style={{ textAlign: "center" }}>{C.appName} {expo.version}</Title>
           <Link
-            to={C.homePage}
+            to={C.sourceCode}
             external
             renderChild={(props) => (
               <TouchableRipple {...props}>
-                <Text style={{ textAlign: "center", color: theme.colors.accentText, textDecorationLine: "underline", margin: 10 }}>{C.homePage}</Text>
+                <Text style={{ textAlign: "center", color: theme.colors.accentText, textDecorationLine: "underline", margin: 10 }}>{C.sourceCode}</Text>
               </TouchableRipple>
             )}
           />

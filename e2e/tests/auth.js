@@ -13,12 +13,12 @@ run(async () => {
   // (the whole page: these screens have no drawer, which A.has leaves out)
   const has = async (text) => (await p.innerText("body")).includes(text);
   await p.goto(config.appUrl + "/"); await wait(4000);
-  check("the login has its own bar with the help links, and no menu", (await p.getByRole("link", { name: "FAQ" }).count() === 1) &&
+  check("the login has its own bar with the help links, and no menu", (await p.getByRole("link", { name: "Source code" }).count() === 1) &&
     (await p.getByRole("link", { name: "Report an issue" }).count() === 1) && (await btn(/^main menu$/i).count() === 0));
-  check("it says which server it logs in to", await has("api.etebase.com") && await has("Default"));
+  check("it has no server of its own: one has to be set", await has("No server set") && !(await has("Default")));
   await btn(/^log in$/i).click(); await wait(800);
-  check("empty fields are required", ((await p.innerText("body")).match(/This field is required/g) ?? []).length === 2);
-  await vis('[aria-label="Change the server"]').click(); await wait(300);
+  check("empty fields are required, the server too", ((await p.innerText("body")).match(/This field is required/g) ?? []).length === 3);
+  check("and the server's field is opened for it", await vis('input[aria-label="Server URL"]').count() === 1);
   await vis('input[aria-label="Server URL"]').fill("http://example.com");
   await vis('input[aria-label="Username"]').fill("someone");
   await vis('input[aria-label="Password"]').fill("something");
@@ -30,7 +30,7 @@ run(async () => {
 
   // Signing up
   await p.getByRole("link", { name: "Create an account" }).click(); await wait(2000);
-  check("the signup is reached from the login", await has("Create an account") && await has("free trial"));
+  check("the signup is reached from the login", await has("Create an account") && await has("Already have one?"));
   const username = `auth-${n}`;
   const password = `auth-password-${n}`;
   await vis('[aria-label="Change the server"]').click(); await wait(300);

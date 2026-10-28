@@ -23,7 +23,6 @@ import { setSettings, addError, popError, login } from "./store/actions";
 import LogoutDialog from "./components/LogoutDialog";
 import ConfirmationDialog from "./widgets/ConfirmationDialog";
 import PasswordInput from "./widgets/PasswordInput";
-import LinkButton from "./widgets/LinkButton";
 import { useCredentials } from "./credentials";
 
 // Opens a new issue about the crash, with what went wrong filled in (it's only sent once it's
@@ -111,13 +110,6 @@ function SessionExpiredDialog() {
         >
           {errorPassword}
         </HelperText>
-        {!C.genericMode && (
-          <>
-            <LinkButton to={C.forgotPassword} external>
-              <Text>Forget password?</Text>
-            </LinkButton>
-          </>
-        )}
       </>
     </ConfirmationDialog>
   ) : null;

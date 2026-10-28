@@ -28,9 +28,9 @@ const LoginScreen = React.memo(function _LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [loading, error, setPromise] = useLoading();
 
-  function onFormSubmit(username: string, password: string, serviceApiUrl?: string) {
+  function onFormSubmit(username: string, password: string, serviceApiUrl: string) {
     setPromise((async () => {
-      const etebase = await Etebase.Account.login(username, password, serviceApiUrl ?? C.serviceApiBase);
+      const etebase = await Etebase.Account.login(username, password, serviceApiUrl);
       dispatch(login(etebase));
       navigation.navigate("AccountWizard");
     })());

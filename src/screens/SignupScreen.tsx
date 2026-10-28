@@ -5,7 +5,7 @@ import * as React from "react";
 
 import * as Etebase from "etebase";
 
-import { Linking, Platform, View, TextInput as NativeTextInput } from "react-native";
+import { Platform, View, TextInput as NativeTextInput } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
@@ -18,7 +18,6 @@ import { useAsyncDispatch } from "../store";
 import { login } from "../store/actions";
 import { enforcePasswordRules, PASSWORD_MIN_LENGTH, validateServerUrl } from "../helpers";
 
-import * as C from "../constants";
 import { useCredentials } from "../credentials";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -60,8 +59,7 @@ export default React.memo(function SignupScreen() {
   const passwordRef = React.useRef<NativeTextInput>(null);
 
   async function onSubmit() {
-    // The default server is used when it's left empty
-    const serverUrl = server.trim() || undefined;
+    const serverUrl = server.trim();
 
     const errors: FormErrors = {};
     const fieldRequired = "This field is required!";
@@ -82,7 +80,7 @@ export default React.memo(function SignupScreen() {
       }
     }
 
-    const serverError = (serverUrl) ? validateServerUrl(serverUrl) : undefined;
+    const serverError = (serverUrl) ? validateServerUrl(serverUrl) : fieldRequired;
     if (serverError) {
       errors.server = serverError;
     }
@@ -98,7 +96,7 @@ export default React.memo(function SignupScreen() {
         username,
         email,
       };
-      const etebase = await Etebase.Account.signup(user, password, serverUrl ?? C.serviceApiBase);
+      const etebase = await Etebase.Account.signup(user, password, serverUrl);
       dispatch(login(etebase));
       navigation.navigate("AccountWizard");
     } catch (e) {
@@ -145,21 +143,6 @@ export default React.memo(function SignupScreen() {
         linkLabel="Log in"
         onLink={() => navigation.navigate("Login")}
       />
-      {(!C.genericMode) && (
-        <TouchableRipple
-          accessibilityRole="link"
-          accessibilityLabel="You're starting a free trial on this server. See pricing"
-          onPress={() => Linking.openURL(C.pricing)}
-          style={{ borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: theme.colors.accentTint }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <MaterialCommunityIcons name="information-outline" size={18} color={theme.colors.accent} />
-            <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textBody }}>
-              You’re starting a free trial on this server. <Text style={{ color: theme.colors.accentText, fontFamily: fonts.medium }}>See pricing ↗</Text>
-            </Text>
-          </View>
-        </TouchableRipple>
-      )}
       {(errors.general) && <ErrorBox message={errors.general} />}
       <ServerBox verb="Creating your account on" value={server} onChange={setServer} error={errors.server} />
       <View style={{ gap: 16 }}>

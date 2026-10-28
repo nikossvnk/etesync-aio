@@ -4,17 +4,10 @@
 import { Platform } from "react-native";
 
 export const appName = "EteSync";
-export const homePage = "https://www.etesync.com/";
-export const faq = homePage + "faq/";
-export const pricing = homePage + "pricing/";
 export const sourceCode = "https://github.com/nikossvnk/etesync-aio";
 export const reportIssue = sourceCode + "/issues";
 
-export const forgotPassword = faq + "#forgot-password";
-
-export const serviceApiBase = "https://api.etebase.com/partner/etesync/";
-
-// In generic mode we don't have anything etesync.com specific (app store guidelines)
+// In generic mode we don't have anything specific to EteSync's hosted service (app store guidelines)
 export const genericMode = Platform.OS === "ios";
 
 

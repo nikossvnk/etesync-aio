@@ -71,13 +71,14 @@
     "@types/react": "~19.2.3",
     "@types/redux-actions": "^2.6.5",
     "@types/redux-logger": "^3.0.13",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "babel-preset-expo": "~57.0.0",
     "eslint": "^9.0.0",
     "eslint-plugin-react": "^7.21.2",
     "globals": "^17.13.0",
     "license-checker": "^25.0.1",
     "patch-package": "^8.0.1",
-    "typescript": "~6.0.3",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.72.0"
   },
   "overrides": {

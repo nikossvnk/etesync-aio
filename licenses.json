@@ -46,6 +46,11 @@
       "publisher": "Tom Hacohen",
       "url": "https://stosb.com"
     },
+    "expo": {
+      "licenses": "MIT",
+      "repository": "https://github.com/expo/expo",
+      "publisher": "Expo"
+    },
     "expo-file-system": {
       "licenses": "MIT",
       "repository": "https://github.com/expo/expo",
@@ -65,11 +70,6 @@
       "licenses": "MIT",
       "repository": "https://github.com/expo/expo",
       "publisher": "650 Industries, Inc."
-    },
-    "expo": {
-      "licenses": "MIT",
-      "repository": "https://github.com/expo/expo",
-      "publisher": "Expo"
     },
     "fflate": {
       "licenses": "MIT",
@@ -106,9 +106,17 @@
       "licenses": "MIT",
       "repository": "https://github.com/moment/moment"
     },
+    "react": {
+      "licenses": "MIT",
+      "repository": "https://github.com/facebook/react"
+    },
     "react-dom": {
       "licenses": "MIT",
       "repository": "https://github.com/facebook/react"
+    },
+    "react-native": {
+      "licenses": "MIT",
+      "repository": "https://github.com/react/react-native"
     },
     "react-native-etebase": {
       "licenses": "LGPL-3.0-only",
@@ -164,30 +172,20 @@
       "repository": "https://github.com/necolas/react-native-web",
       "publisher": "Nicolas Gallagher"
     },
-    "react-native": {
-      "licenses": "MIT",
-      "repository": "https://github.com/react/react-native"
-    },
     "react-redux": {
       "licenses": "MIT",
       "repository": "https://github.com/reduxjs/react-redux",
       "publisher": "Dan Abramov",
       "url": "https://github.com/gaearon"
     },
-    "react": {
+    "redux": {
       "licenses": "MIT",
-      "repository": "https://github.com/facebook/react"
+      "repository": "https://github.com/reduxjs/redux"
     },
     "redux-actions": {
       "licenses": "MIT",
       "repository": "https://github.com/redux-utilities/redux-actions",
       "publisher": "Andrew Clark"
-    },
-    "redux-logger": {
-      "licenses": "MIT",
-      "repository": "https://github.com/theaqua/redux-logger",
-      "publisher": "Eugene Rodionov",
-      "url": "https://github.com/theaqua"
     },
     "redux-persist": {
       "licenses": "MIT",
@@ -197,10 +195,6 @@
       "licenses": "MIT",
       "repository": "https://github.com/reduxjs/redux-thunk",
       "publisher": "Dan Abramov"
-    },
-    "redux": {
-      "licenses": "MIT",
-      "repository": "https://github.com/reduxjs/redux"
     },
     "reselect": {
       "licenses": "MIT",
@@ -252,24 +246,25 @@
       "licenses": "MIT",
       "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped"
     },
-    "@types/redux-logger": {
-      "licenses": "MIT",
-      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped"
+    "@typescript/native": {
+      "licenses": "Apache-2.0",
+      "repository": "https://github.com/microsoft/TypeScript",
+      "publisher": "Microsoft Corp."
     },
     "babel-preset-expo": {
       "licenses": "MIT",
       "repository": "https://github.com/expo/expo",
       "publisher": "Expo"
     },
-    "eslint-plugin-react": {
-      "licenses": "MIT",
-      "repository": "https://github.com/jsx-eslint/eslint-plugin-react",
-      "publisher": "Yannick Croissant"
-    },
     "eslint": {
       "licenses": "MIT",
       "repository": "https://github.com/eslint/eslint",
       "publisher": "Nicholas C. Zakas"
+    },
+    "eslint-plugin-react": {
+      "licenses": "MIT",
+      "repository": "https://github.com/jsx-eslint/eslint-plugin-react",
+      "publisher": "Yannick Croissant"
     },
     "globals": {
       "licenses": "MIT",
@@ -277,24 +272,19 @@
       "publisher": "Sindre Sorhus",
       "url": "https://sindresorhus.com"
     },
-    "license-checker": {
-      "licenses": "BSD-3-Clause",
-      "repository": "https://github.com/davglass/license-checker",
-      "publisher": "Dav Glass"
-    },
     "patch-package": {
       "licenses": "MIT",
       "repository": "https://github.com/ds300/patch-package",
       "publisher": "David Sheldrick"
     },
-    "typescript-eslint": {
-      "licenses": "MIT",
-      "repository": "https://github.com/typescript-eslint/typescript-eslint"
-    },
     "typescript": {
       "licenses": "Apache-2.0",
       "repository": "https://github.com/microsoft/TypeScript",
       "publisher": "Microsoft Corp."
+    },
+    "typescript-eslint": {
+      "licenses": "MIT",
+      "repository": "https://github.com/typescript-eslint/typescript-eslint"
     }
   }
 }

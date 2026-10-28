@@ -4,7 +4,6 @@
 import { createStore, applyMiddleware, Store } from "redux";
 import { persistStore } from "redux-persist";
 import { thunk as thunkMiddleware } from "redux-thunk";
-import { createLogger } from "redux-logger";
 import { useDispatch } from "react-redux";
 import { ActionMeta } from "redux-actions";
 
@@ -27,40 +26,18 @@ if (__DEV__) {
     "persist/REHYDRATE",
   ];
 
-  const predicate = (_: any, action: { type: string }) => {
-    return !ignoreActions.includes(action.type);
-  };
-
-  const logger = {
-    log: (msg: string) => {
-      if (msg[0] === "#") {
-        console.log(msg);
-      }
-    },
-  };
-
-  middleware.push(createLogger({
-    predicate,
-    logger,
-    stateTransformer: () => "state",
-    actionTransformer: ({ type, error, payload }) => ({ type, error, payload: (payload !== undefined) }),
-    titleFormatter: (action: { type: string, error: any, payload: boolean }, time: string, took: number) => {
-      let prefix = "->";
-      if (action.error) {
-        prefix = "xx";
-      } else if (action.payload) {
-        prefix = "==";
-      }
-      return `# ${prefix} ${action.type} @ ${time} (in ${took.toFixed(2)} ms)`;
-    },
-    colors: {
-      title: false,
-      prevState: false,
-      action: false,
-      nextState: false,
-      error: false,
-    },
-  }));
+  // Logs each action's type, whether it failed or carried a payload, and how long it took (never the
+  // state or the payload, which have the decrypted data)
+  middleware.push(() => (next: (action: any) => any) => (action: any) => {
+    const started = performance.now();
+    const result = next(action);
+    if ((typeof action?.type === "string") && !ignoreActions.includes(action.type)) {
+      const prefix = (action.error) ? "xx" : (action.payload !== undefined) ? "==" : "->";
+      const time = new Date().toTimeString().slice(0, 8);
+      console.log(`# ${prefix} ${action.type} @ ${time} (in ${(performance.now() - started).toFixed(2)} ms)`);
+    }
+    return result;
+  });
 }
 
 // FIXME: Hack, we don't actually return a promise when one is not passed.

@@ -9,7 +9,7 @@
 
 import * as ICAL from "ical.js";
 
-import { EventType } from "./pim-types";
+import { EventType, utcNow } from "./pim-types";
 
 // A time property, with its time zone (as ical.js does it for DTSTART)
 function timeProperty(name: string, time: ICAL.Time) {
@@ -104,7 +104,7 @@ export function changeOccurrence(event: EventType, rid: ICAL.Time, change: (x: I
   }
   change(changed);
   bumpSequence(changed.component);
-  changed.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
+  changed.component.updatePropertyWithValue("last-modified", utcNow());
 }
 
 // Cancels one time of a repeating event (and what was changed of it)

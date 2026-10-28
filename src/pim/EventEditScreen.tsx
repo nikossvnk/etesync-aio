@@ -21,7 +21,7 @@ import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import AppbarAction from "../widgets/AppbarAction";
 import { useTheme } from "../theme";
 import * as C from "../constants";
-import { EventType, timezoneLoadFromName } from "./pim-types";
+import { EventType, timezoneLoadFromName, utcNow } from "./pim-types";
 import AttendeesField, { AttendeeEntry, attendeesOf, setAttendees } from "./AttendeesField";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
 import { useDateFormats } from "./format";
@@ -292,7 +292,7 @@ export default function EventEditScreen(props: PropsType) {
         bumpSequence(event.component);
       }
     }
-    event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
+    event.component.updatePropertyWithValue("last-modified", utcNow());
 
     setSaving(true);
     try {
@@ -311,7 +311,7 @@ export default function EventEditScreen(props: PropsType) {
     if (which === "this") {
       const event = existing!.clone();
       excludeOccurrence(event, rid!);
-      event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
+      event.component.updatePropertyWithValue("last-modified", utcNow());
       await savePimItem(etebase, existing!.collectionUid!, event);
       dispatch(pushMessage({ message: "This time of the event was deleted", severity: "success" }) as any);
     } else {

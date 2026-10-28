@@ -16,7 +16,7 @@ import { fonts, useTheme } from "../theme";
 import * as C from "../constants";
 import { StoreState } from "../store";
 import { pushMessage, setSettings } from "../store/actions";
-import { TaskType } from "./pim-types";
+import { TaskType, utcNow } from "./pim-types";
 import { savePimItem, usePimItems } from "./data";
 import { AccentButton, EmptyState, repeatKeyOf, toDateString } from "./widgets";
 import { bumpSequence, changeOccurrence, occurrenceId, updateSeries } from "./recurrence";
@@ -174,7 +174,7 @@ export default function CalendarScreen() {
       updateSeries(event, x.event!);
       bumpSequence(event.component);
     }
-    event.component.updatePropertyWithValue("last-modified", ICAL.Time.now());
+    event.component.updatePropertyWithValue("last-modified", utcNow());
     await savePimItem(etebase, event.collectionUid!, event);
     setSelectedKey(undefined);
     const when = `${(sameDay(start, x.start)) ? "" : fmt.day.format(start) + ", "}${fmt.time(start)} – ${fmt.time(end)}`;

@@ -17,7 +17,7 @@ import { StoreState, TaskSettingsType } from "../store";
 import LoadingIndicator from "../widgets/LoadingIndicator";
 import { fonts, useTheme } from "../theme";
 import * as C from "../constants";
-import { TaskStatusType, TaskType } from "./pim-types";
+import { TaskStatusType, TaskType, utcNow } from "./pim-types";
 import { PimCollection, savePimItem, usePimCollections, usePimItems } from "./data";
 import { AccentButton, EmptyState } from "./widgets";
 import { DateFormats, useDateFormats } from "./format";
@@ -64,8 +64,8 @@ export async function setTaskDone(etebase: Parameters<typeof savePimItem>[0], ta
   changed.collectionUid = task.collectionUid;
   changed.itemUid = task.itemUid;
   changed.status = (done) ? TaskStatusType.Completed : TaskStatusType.NeedsAction;
-  changed.completionDate = (done) ? ICAL.Time.now() : undefined;
-  changed.lastModified = ICAL.Time.now();
+  changed.completionDate = (done) ? utcNow() : undefined;
+  changed.lastModified = utcNow();
   await savePimItem(etebase, task.collectionUid!, changed);
 
   const next = (done) ? task.getNextOccurence() : null;
@@ -80,8 +80,8 @@ async function addTask(etebase: Parameters<typeof savePimItem>[0], colUid: strin
   task.uid = uuid.v4();
   task.title = title;
   task.status = TaskStatusType.NeedsAction;
-  task.lastModified = ICAL.Time.now();
-  task.component.updatePropertyWithValue("created", ICAL.Time.now());
+  task.lastModified = utcNow();
+  task.component.updatePropertyWithValue("created", utcNow());
   if (parent) {
     task.relatedTo = parent.uid;
   }

@@ -9,6 +9,12 @@ import { vtimezoneOf } from "./timezones";
 
 const PRODID = "-//iCal.js EteSync iOS";
 
+// The time now, in UTC, as LAST-MODIFIED, CREATED and COMPLETED have to be (RFC 5545; ICAL.Time.now()
+// is the time on this device's clock, without a time zone)
+export function utcNow() {
+  return ICAL.Time.fromJSDate(new Date(), true);
+}
+
 export interface PimType {
   uid: string;
   collectionUid?: string;
@@ -398,7 +404,7 @@ export class TaskType extends EventType {
     }
 
     nextTask.status = TaskStatusType.NeedsAction;
-    nextTask.lastModified = ICAL.Time.now();
+    nextTask.lastModified = utcNow();
 
     return nextTask;
   }

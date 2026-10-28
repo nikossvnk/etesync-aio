@@ -177,6 +177,8 @@ run(async () => {
   check("the event is on the server in that time zone", await waitForServer(etebase, (s) => s.some((x) => (x.type === types.calendar) &&
     x.contents.some((c) => c.includes(`SUMMARY:Call New York ${n}`) && c.includes(`DTSTART;TZID=America/New_York:${icalDate(today)}T100000`) &&
       c.includes("BEGIN:VTIMEZONE") && c.includes("TZID:America/New_York")))), serverDetail(types.calendar)());
+  check("with when it was changed in UTC (LAST-MODIFIED with a Z)", lastState.some((x) => (x.type === types.calendar) &&
+    x.contents.some((c) => c.includes(`SUMMARY:Call New York ${n}`) && /\r\nLAST-MODIFIED:\d{8}T\d{6}Z\r\n/.test(c))), serverDetail(types.calendar)());
   await p.getByRole("button", { name: `Event Call New York ${n}` }).locator("visible=true").first().click(); await wait(2000);
   check("opened again, it's in its time zone", ((await vis('input[aria-label="Start time"]').inputValue()) === "10:00") &&
     ((await vis('input[aria-label="Time zone"]').inputValue()) === "America/New York"));

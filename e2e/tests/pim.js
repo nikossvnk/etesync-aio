@@ -194,7 +194,9 @@ run(async () => {
   if (tomorrow.getMonth() !== today.getMonth()) {
     await p.locator('[data-testid="date-picker"] >> visible=true').getByRole("button", { name: "Next month" }).click(); await wait(300);
   }
-  await p.locator('[data-testid="date-picker"] >> visible=true').getByRole("button", { name: new RegExp(`\\b${tomorrow.getDate()}\\b`) }).first().click(); await wait(500);
+  // (the small month also shows the last days of the month before, so the label has to have the month too)
+  const tomorrowMonth = tomorrow.toLocaleString("en-GB", { month: "long" });
+  await p.locator('[data-testid="date-picker"] >> visible=true').getByRole("button", { name: new RegExp(`^(?=.*\\b${tomorrow.getDate()}\\b)(?=.*\\b${tomorrowMonth}\\b)`) }).first().click(); await wait(500);
   check("a date can be chosen in a small month, and is shown day first", (await vis('input[aria-label="Start date"]').inputValue()) === ukDate(tomorrow),
     await vis('input[aria-label="Start date"]').inputValue());
   await vis('input[aria-label="Start date"]').fill(ukDate(today)); await wait(300);

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import * as ICAL from "ical.js";
-import * as zones from "./data/zones.json";
+import * as zoneAliases from "./data/zones.json";
 import moment from "moment";
 import * as uuid from "uuid";
+import { vtimezoneOf } from "./timezones";
 
 const PRODID = "-//iCal.js EteSync iOS";
 
@@ -17,19 +18,10 @@ export interface PimType {
   lastModified: ICAL.Time | undefined;
 }
 
+// The time zone of the name (one the browser knows, or another name of one, e.g. Windows'
+// "W. Europe Standard Time"), made from the browser's data, or null if it isn't known
 export function timezoneLoadFromName(timezone: string | null) {
   if (!timezone) {
-    return null;
-  }
-
-  const allZones: { [key: string]: { ics: string[] } } = zones.zones;
-  const aliases: { [key: string]: { aliasTo: string } } = zones.aliases;
-  let zone = allZones[timezone];
-  if (!zone && aliases[timezone]) {
-    zone = allZones[aliases[timezone].aliasTo];
-  }
-
-  if (!zone) {
     return null;
   }
 
@@ -37,11 +29,11 @@ export function timezoneLoadFromName(timezone: string | null) {
     return ICAL.TimezoneService.get(timezone);
   }
 
-  const component = new ICAL.Component("vtimezone");
-  zone.ics.forEach((zonePart: string) => {
-    component.addSubcomponent(new ICAL.Component(ICAL.parse(zonePart)));
-  });
-  component.addPropertyWithValue("tzid", timezone);
+  const aliases: { [key: string]: { aliasTo: string } } = zoneAliases.aliases;
+  const component = vtimezoneOf(timezone) ?? (aliases[timezone] && vtimezoneOf(aliases[timezone].aliasTo, timezone));
+  if (!component) {
+    return null;
+  }
 
   const retZone = new ICAL.Timezone({
     component,

@@ -212,7 +212,9 @@ export default function EventEditScreen(props: PropsType) {
       if (allDay) {
         return ICAL.Time.fromData({ ...data, hour: 0, minute: 0, isDate: true });
       }
-      return (zone) ? ICAL.Time.fromData({ ...data, isDate: false }, zone) : ICAL.Time.fromJSDate(date, false);
+      // In a time zone this device doesn't know, the times (as on this device) are saved in UTC,
+      // never without a time zone (a floating time, which would be at another moment elsewhere)
+      return (zone) ? ICAL.Time.fromData({ ...data, isDate: false }, zone) : ICAL.Time.fromJSDate(date, true);
     }
     const icalStart = toIcal(start);
     const icalEnd = toIcal(end);
@@ -356,6 +358,11 @@ export default function EventEditScreen(props: PropsType) {
         {!allDay && (
           <Field label="Time zone">
             <TimezonePicker value={timezone} onChange={setTimezone} />
+            {!loadZone(timezone) && (
+              <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }} testID="timezone-unknown">
+                This device doesn't know this time zone, so the times are saved in UTC
+              </Text>
+            )}
             {(timezone !== currentTimezone()) && (() => {
               // The start, where the device is
               const start = fromDateTimeStrings(startDate, startTime);

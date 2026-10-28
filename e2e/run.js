@@ -6,7 +6,10 @@ const fs = require("fs"), path = require("path");
 const { api } = require("./lib");
 const dir = path.join(__dirname, "tests");
 const args = process.argv.slice(2);
-const tests = args.length ? args : fs.readdirSync(dir).filter((f) => f.endsWith(".js")).sort();
+// E2E_SHARD=i/n runs only every n-th test, starting from the i-th (CI runs the parts in parallel)
+const [shard, shards] = (process.env.E2E_SHARD || "1/1").split("/").map(Number);
+const tests = args.length ? args : fs.readdirSync(dir).filter((f) => f.endsWith(".js")).sort()
+  .filter((_, i) => i % shards === shard - 1);
 
 (async () => {
   if (!args.length && !process.env.E2E_KEEP_DATA) {

@@ -35,6 +35,7 @@ They change the data of the test account, so never point them at a real server o
    node setup.js
    node run.js                    # all of them
    node run.js offline.js         # or some of them
+   E2E_SHARD=2/3 node run.js      # every third test, from the second (CI runs 3 parts in parallel)
    ```
 
 A full run takes about 15 minutes, as the tests wait for syncs and reconnections. It starts by

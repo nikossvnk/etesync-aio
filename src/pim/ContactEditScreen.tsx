@@ -22,7 +22,7 @@ import NotFound from "../widgets/NotFound";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import AppbarAction from "../widgets/AppbarAction";
 import * as C from "../constants";
-import { ContactType } from "./pim-types";
+import { ContactType, utcNow } from "./pim-types";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
 import { AccentButton, CollectionPicker, Field, FieldInput, pimStyles } from "./widgets";
 import { contactName } from "./ContactsScreen";
@@ -113,7 +113,7 @@ export default function ContactEditScreen(props: PropsType) {
     }
     const comp = contact.comp;
     comp.updatePropertyWithValue("prodid", "-//iCal.js EteSync Web");
-    comp.updatePropertyWithValue("rev", ICAL.Time.now());
+    comp.updatePropertyWithValue("rev", utcNow());
     if (name.trim() !== existing?.fn) {
       comp.updatePropertyWithValue("fn", name.trim());
       // The structured name: last name, first name, middle name(s), prefix, suffix

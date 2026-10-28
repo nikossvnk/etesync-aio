@@ -20,7 +20,7 @@ import Checkbox from "../widgets/Checkbox";
 import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import AppbarAction from "../widgets/AppbarAction";
 import * as C from "../constants";
-import { TaskStatusType, TaskType } from "./pim-types";
+import { TaskStatusType, TaskType, utcNow } from "./pim-types";
 import { priorityName } from "./TasksScreen";
 import { useTheme } from "../theme";
 import { deletePimItem, savePimItem, usePimCollections, usePimItems } from "./data";
@@ -136,7 +136,7 @@ export default function TaskEditScreen(props: PropsType) {
     }
     if (done !== existing?.finished) {
       task.status = (done) ? TaskStatusType.Completed : TaskStatusType.NeedsAction;
-      task.completionDate = (done) ? ICAL.Time.now() : undefined;
+      task.completionDate = (done) ? utcNow() : undefined;
     }
     if ((repeat !== "none") && (repeat !== "custom") && !dueDate) {
       setError("A task that repeats needs a due date");
@@ -155,7 +155,7 @@ export default function TaskEditScreen(props: PropsType) {
       // (the times of a repeating task that were changed or cancelled on their own are kept with it)
       updateSeries(task, existing);
     }
-    task.lastModified = ICAL.Time.now();
+    task.lastModified = utcNow();
 
     try {
       await savePimItem(etebase, list, task);

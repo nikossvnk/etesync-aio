@@ -181,7 +181,7 @@ export default function CollectionMembersScreen(props: PropsType) {
               Would you like to revoke {revokeUser?.username}'s access?
             </Paragraph>
             <Paragraph>
-              Please be advised that a malicious user would potentially be able to retain access to encryption keys. Please refer to the FAQ for more information.
+              Please be advised that a malicious user would potentially be able to retain access to encryption keys.
             </Paragraph>
           </>
         )}

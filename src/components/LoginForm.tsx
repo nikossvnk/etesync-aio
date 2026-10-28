@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { Linking, TextInput as NativeTextInput, View } from "react-native";
-import { Text } from "react-native-paper";
+import { TextInput as NativeTextInput, View } from "react-native";
 
-import * as C from "../constants";
 import { validateServerUrl } from "../helpers";
-import { useTheme } from "../theme";
 import { AuthField, PasswordField, PrimaryButton, ServerBox, UsernameField } from "./Auth";
 
 interface FormErrors {
@@ -17,12 +14,11 @@ interface FormErrors {
 }
 
 interface PropsType {
-  onSubmit: (username: string, password: string, serviceApiUrl?: string) => void;
+  onSubmit: (username: string, password: string, serviceApiUrl: string) => void;
   loading?: boolean;
 }
 
 export default function LoginForm(props: PropsType) {
-  const theme = useTheme();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [server, setServer] = React.useState("");
@@ -31,8 +27,7 @@ export default function LoginForm(props: PropsType) {
   const passwordRef = React.useRef<NativeTextInput>(null);
 
   function onSubmit() {
-    // The default server is used when it's left empty
-    const serverUrl = server.trim() || undefined;
+    const serverUrl = server.trim();
 
     const errors: FormErrors = {};
     const fieldRequired = "This field is required!";
@@ -45,7 +40,7 @@ export default function LoginForm(props: PropsType) {
       errors.password = fieldRequired;
     }
 
-    const serverError = (serverUrl) ? validateServerUrl(serverUrl) : undefined;
+    const serverError = (serverUrl) ? validateServerUrl(serverUrl) : fieldRequired;
     if (serverError) {
       errors.server = serverError;
     }
@@ -66,11 +61,6 @@ export default function LoginForm(props: PropsType) {
         <AuthField
           label="Password"
           error={errors.password}
-          right={(!C.genericMode) && (
-            <Text accessibilityRole="link" onPress={() => Linking.openURL(C.forgotPassword)} style={{ fontSize: 13, color: theme.colors.accentText }}>
-              Forgot password?
-            </Text>
-          )}
         >
           <PasswordField
             ref={passwordRef}

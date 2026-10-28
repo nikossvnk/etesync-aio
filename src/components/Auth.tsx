@@ -19,10 +19,7 @@ import { tint } from "../pim/style";
 const mono = Platform.select({ web: "'IBM Plex Mono', ui-monospace, monospace", default: "monospace" });
 
 export const helpLinks = [
-  ...((C.genericMode) ? [] : [
-    { title: "Website", link: C.homePage, icon: "web" },
-    { title: "FAQ", link: C.faq, icon: "help-circle-outline" },
-  ]),
+  { title: "Source code", link: C.sourceCode, icon: "web" },
   { title: "Report an issue", link: C.reportIssue, icon: "bug-outline" },
 ];
 
@@ -136,7 +133,7 @@ export function AuthHeading(props: { title: string, question?: string, linkLabel
   );
 }
 
-// Which server the account is on: the default one, unless another one is set
+// Which server the account is on (there's no default one: it has to be given)
 export function ServerBox(props: { verb: string, value: string, onChange: (value: string) => void, error?: string, inputRef?: React.Ref<TextInput> }) {
   const theme = useTheme();
   const [open, setOpen] = React.useState(!!props.value || !!props.error);
@@ -153,11 +150,12 @@ export function ServerBox(props: { verb: string, value: string, onChange: (value
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{props.verb}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: mono, fontSize: 13, color: theme.colors.text }}>
-              {(custom) ? custom.replace(/^https?:\/\//, "") : new URL(C.serviceApiBase).host}
-            </Text>
-            {!custom && (
-              <Text style={[styles.default, { color: theme.colors.textMuted, backgroundColor: theme.colors.field }]}>Default</Text>
+            {(custom) ? (
+              <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: mono, fontSize: 13, color: theme.colors.text }}>
+                {custom.replace(/^https?:\/\//, "")}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>No server set</Text>
             )}
           </View>
         </View>
@@ -168,14 +166,14 @@ export function ServerBox(props: { verb: string, value: string, onChange: (value
           onPress={() => setOpen(!open)}
           style={[styles.smallButton, { borderColor: theme.colors.border }]}
         >
-          <Text style={{ fontSize: 13, color: theme.colors.text }}>{(open) ? "Done" : "Change"}</Text>
+          <Text style={{ fontSize: 13, color: theme.colors.text }}>{(open) ? "Done" : (custom) ? "Change" : "Set"}</Text>
         </TouchableRipple>
       </View>
       {open && (
         <AuthField
           label="Server URL"
           error={props.error}
-          help="For a self-hosted or company server. Leave empty to use the default."
+          help="The address of your Etebase server."
         >
           <AuthInput
             ref={props.inputRef}
@@ -389,13 +387,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 12,
-  },
-  default: {
-    fontSize: 11,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: 999,
-    overflow: "hidden",
   },
   smallButton: {
     height: 34,

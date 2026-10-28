@@ -27,28 +27,16 @@ import { fonts, useTheme } from "./theme";
 
 export const externalMenuItems = [
   {
+    title: "Source code",
+    link: C.sourceCode,
+    icon: "home",
+  },
+  {
     title: "Report issue",
     link: C.reportIssue,
     icon: "bug",
   },
 ];
-
-if (!C.genericMode) {
-  externalMenuItems.unshift(
-    {
-      title: "FAQ",
-      link: C.faq,
-      icon: "forum",
-    }
-  );
-  externalMenuItems.unshift(
-    {
-      title: "Web site",
-      link: C.homePage,
-      icon: "home",
-    }
-  );
-}
 
 export function FingerprintDialog(props: { visible: boolean, onDismiss: () => void }) {
   const etebase = useCredentials()!;

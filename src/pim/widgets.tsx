@@ -14,8 +14,8 @@ import MenuItem from "../widgets/MenuItem";
 import { fonts, useTheme } from "../theme";
 import { PimCollection } from "./data";
 import { DateFormats, useDateFormats } from "./format";
-import * as zoneData from "./data/zones.json";
 import { Reminder, reminderKey, reminderLabel, reminderPresets } from "./reminders";
+import { knownTimezones } from "./timezones";
 
 export function ColorDot(props: { color: string, size?: number, style?: StyleProp<ViewStyle> }) {
   const size = props.size ?? 10;
@@ -500,8 +500,8 @@ export function applyRepeat(comp: ICAL.Component, repeat: RepeatKey) {
   }
 }
 
-// The time zones (as in the iCalendar data of the web app), and UTC
-const timezones: string[] = ["UTC", ...Object.keys(zoneData.zones).sort()];
+// The time zones the browser knows, and UTC
+const timezones: string[] = ["UTC", ...knownTimezones().filter((x) => x !== "UTC").sort()];
 
 export function timezoneName(zone: string) {
   return zone.replace(/_/g, " ");

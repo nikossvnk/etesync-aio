@@ -140,6 +140,11 @@ declare module "ical.js" {
     public toSeconds(): number;
   }
 
+  export class UtcOffset {
+    static public fromString(str: string): UtcOffset;
+    public toSeconds(): number;
+  }
+
   export class RecurExpansion {
     public complete: boolean;
 
@@ -154,6 +159,8 @@ declare module "ical.js" {
 
     public tzid: string;
     public component: Component;
+
+    public utcOffset(tt: Time): number;
 
     constructor(data: Component | {
       component: string | Component;
@@ -206,6 +213,7 @@ declare module "ical.js" {
   }
 
   export class Recur {
+    static public fromString(str: string): Recur;
     constructor(data?: RecurData);
     public until: Time | null;
     public freq: FrequencyValues;

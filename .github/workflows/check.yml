@@ -1,8 +1,9 @@
 name: Check
 
 on:
+  # Other branches are checked by their pull requests (both would run the same checks twice)
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
 
 permissions:

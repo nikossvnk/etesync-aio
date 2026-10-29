@@ -77,8 +77,18 @@ run(async () => {
   const B = await session(b, "B", { width: 1440, height: 900 }, { timezoneId: "Europe/Berlin" });
   await B.login({ username, password });
   await sideRow(B, "Calendar").click(); await B.wait(3000);
+  // Its day in Berlin is Indiana's, which from midnight in Berlin to midnight in Indiana is Berlin's
+  // yesterday (maybe in the month before), so the calendar's own day can't be the one to look at
+  const at = momentOf("America/Indianapolis", today, "10:00");
+  const day = clock("Europe/Berlin", at).date;
+  if (day.slice(0, 6) !== clock("Europe/Berlin", new Date()).date.slice(0, 6)) {
+    await B.btn(/^previous month$/i).click(); await B.wait(1000);
+  }
+  const dayName = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" })
+    .format(new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)), 12)));
+  await B.p.getByRole("button", { name: `${dayName}, ` }).locator("visible=true").first().click(); await B.wait(1000);
   await B.p.getByRole("button", { name: `Event ${title}` }).locator("visible=true").first().click(); await B.wait(2000);
-  const berlin = clock("Europe/Berlin", momentOf("America/Indianapolis", today, "10:00")).time;
+  const berlin = clock("Europe/Berlin", at).time;
   check("opened in Berlin, it's still at 10:00 in Indiana's time zone", ((await B.vis('input[aria-label="Start time"]').inputValue()) === "10:00") &&
     ((await B.vis('input[aria-label="Time zone"]').inputValue()) === "America/Indianapolis"));
   const note = await B.p.locator('[data-testid="timezone-local"] >> visible=true').innerText().catch(() => "");

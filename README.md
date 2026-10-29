@@ -27,13 +27,15 @@ curl -fsSL https://raw.githubusercontent.com/nikossvnk/etesync-aio/main/desktop/
 
 It downloads the latest release (the built app, about 2 MB) from this repository's GitHub
 releases, checks its checksum, and installs it in your home directory, with "EteSync Desktop" in
-the applications menu and on the desktop. It runs on `http://localhost:8092`, only reachable from
+the applications menu. It runs on `http://localhost:8092`, only reachable from
 this computer. Then log in with your server's URL (under "Advanced settings"), e.g.
 `https://etebase.example.com`.
 
 - **Updating:** run the same line again.
 - **Without systemd,** or to not have a service started at login: `curl … | SERVICE=no sh`. The
   shortcut then starts the server when it's opened.
+- **A shortcut on the desktop:** `~/.local/share/etesync-aio-web/install.sh --desktop-icon` (any time
+  after installing; `--no-desktop-icon` removes it), or `curl … | DESKTOP_ICON=yes sh`.
 - **Trying it without installing:** download `etesync-desktop-VERSION.tar.gz` from the releases,
   unpack it, and run `./etesync-desktop` in it.
 - **Removing it:** `~/.local/share/etesync-aio-web/install.sh --uninstall`

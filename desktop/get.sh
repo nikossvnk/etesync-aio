@@ -6,7 +6,7 @@
 #   curl -fsSL .../get.sh | VERSION=1.2.0 sh     # a given version
 #   curl -fsSL .../get.sh | FORCE=1 sh           # install it again even when it's that version already
 #
-# The options of install.sh (SERVICE, PORT, BROWSER, LOW_MEMORY, PROFILE) are passed on to it. RELEASES (default: the
+# The options of install.sh (SERVICE, PORT, BROWSER, LOW_MEMORY, PROFILE, DESKTOP_ICON) are passed on to it. RELEASES (default: the
 # repository's releases on GitHub) is where the files are downloaded from, VERSION's files being in
 # RELEASES/download/vVERSION/.
 set -eu

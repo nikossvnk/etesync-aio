@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
-import { IconButton, Text, TouchableRipple } from "react-native-paper";
+import { IconButton, Snackbar, Text, TouchableRipple } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigation } from "@react-navigation/native";
@@ -12,20 +12,25 @@ import * as uuid from "uuid";
 
 import { useCredentials } from "../credentials";
 import { useSyncGate } from "../SyncGate";
-import { pushMessage, setSettings } from "../store/actions";
-import { StoreState, TaskSettingsType } from "../store";
+import { popMessage, pushMessage, setSettings } from "../store/actions";
+import { store, StoreState, TaskSettingsType, TaskViewType } from "../store";
 import LoadingIndicator from "../widgets/LoadingIndicator";
+import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import { fonts, useTheme } from "../theme";
 import * as C from "../constants";
 import { TaskStatusType, TaskType, utcNow } from "./pim-types";
-import { PimCollection, savePimItem, usePimCollections, usePimItems } from "./data";
+import { deletePimItem, deletePimItems, PimCollection, savePimItem, usePimCollections, usePimItems } from "./data";
 import { AccentButton, EmptyState } from "./widgets";
 import { DateFormats, useDateFormats } from "./format";
 import { useDialogs } from "./Dialogs";
-import { addDays, sameDay, startOfDay } from "./occurrences";
+import { sameDay, startOfDay } from "./occurrences";
 import { mono } from "./style";
 import { reminderLabel, remindersOf } from "./reminders";
 import { panelStyle, SmallButton } from "./CalendarParts";
+import {
+  compareDoneTasks, compareOpenTasks, groupTasks, parseQuickAdd, priorities, Priority, priorityLabels, priorityOf,
+  priorityTitle, setPriority, TaskGroupBy,
+} from "./tasks";
 
 export function formatDue(task: TaskType, fmt: DateFormats) {
   const due = task.dueDate;
@@ -39,10 +44,9 @@ export function formatDue(task: TaskType, fmt: DateFormats) {
   return fmt.shortDate(date) + ((due.isDate) ? "" : ` ${fmt.time(date)}`);
 }
 
-// Priorities 1-4 are high, 5 medium, 6-9 low (0 or none: none)
+// "High", "Medium", "Low" or "None"
 export function priorityName(task: TaskType) {
-  const p = Number(task.priority ?? 0);
-  return (p >= 1 && p <= 4) ? "High" : (p === 5) ? "Medium" : (p >= 6 && p <= 9) ? "Low" : "None";
+  return priorityLabels[priorityOf(task)];
 }
 
 // How a repeat rule reads, e.g. "Every week" or "Every 2 days"
@@ -75,10 +79,33 @@ export async function setTaskDone(etebase: Parameters<typeof savePimItem>[0], ta
   return next;
 }
 
-async function addTask(etebase: Parameters<typeof savePimItem>[0], colUid: string, title: string, parent?: TaskType) {
+// Puts a task back as it was before it was marked as done, without the next time of a repeating one
+async function undoDone(etebase: Parameters<typeof savePimItem>[0], task: TaskType, next: TaskType | null) {
+  const changed = task.clone();
+  changed.collectionUid = task.collectionUid;
+  changed.itemUid = task.itemUid;
+  changed.lastModified = utcNow();
+  await savePimItem(etebase, task.collectionUid!, changed);
+  if (next) {
+    await deletePimItem(etebase, next);
+  }
+}
+
+async function changePriority(etebase: Parameters<typeof savePimItem>[0], task: TaskType, priority: Priority) {
+  const changed = task.clone();
+  changed.collectionUid = task.collectionUid;
+  changed.itemUid = task.itemUid;
+  if (setPriority(changed, priority)) {
+    changed.lastModified = utcNow();
+    await savePimItem(etebase, task.collectionUid!, changed);
+  }
+}
+
+async function addTask(etebase: Parameters<typeof savePimItem>[0], colUid: string, title: string, parent?: TaskType, priority: Priority = "none") {
   const task = new TaskType(null);
   task.uid = uuid.v4();
   task.title = title;
+  setPriority(task, priority);
   task.status = TaskStatusType.NeedsAction;
   task.lastModified = utcNow();
   task.component.updatePropertyWithValue("created", utcNow());
@@ -89,17 +116,59 @@ async function addTask(etebase: Parameters<typeof savePimItem>[0], colUid: strin
   return task;
 }
 
-function dueTime(task: TaskType) {
-  return task.dueDate?.toJSDate().getTime() ?? Infinity;
+function compare(sortBy: TaskSettingsType["sortBy"]) {
+  if (sortBy === "title") {
+    return (a: TaskType, b: TaskType) => (a.title ?? "").localeCompare(b.title ?? "");
+  }
+  return compareOpenTasks;
 }
 
-function compare(sortBy: TaskSettingsType["sortBy"]) {
-  return (a: TaskType, b: TaskType) => {
-    if (sortBy === "title") {
-      return (a.title ?? "").localeCompare(b.title ?? "");
-    }
-    return (dueTime(a) - dueTime(b)) || (Number(a.priority || 10) - Number(b.priority || 10)) || (a.title ?? "").localeCompare(b.title ?? "");
-  };
+const defaultView: TaskViewType = { groupBy: "date", priorities: [] };
+
+function priorityColor(theme: ReturnType<typeof useTheme>, priority: Priority) {
+  return { high: theme.colors.warning, medium: theme.colors.caution, low: theme.colors.accent, none: theme.colors.textMuted }[priority];
+}
+
+// The mark of a priority: as many bars filled as it's high (so it isn't told by its colour alone)
+function PriorityBars(props: { priority: Priority }) {
+  const theme = useTheme();
+  const filled = 3 - priorities.indexOf(props.priority);
+  const color = priorityColor(theme, props.priority);
+  return (
+    <View style={styles.bars} aria-hidden>
+      {[5, 8, 11].map((height, idx) => (
+        <View key={height} style={[styles.bar, { height, backgroundColor: (idx < filled) ? color : theme.colors.border }]} />
+      ))}
+    </View>
+  );
+}
+
+// A row of buttons of which one is chosen (e.g. how the tasks are grouped)
+function Segmented<T extends string>(props: { label: string, options: { value: T, label: string, icon?: React.ReactNode }[], value: T, onChange: (value: T) => void, stretch?: boolean }) {
+  const theme = useTheme();
+  return (
+    <View accessibilityRole="radiogroup" accessibilityLabel={props.label} style={[styles.segmented, { backgroundColor: theme.colors.sidebar, borderColor: theme.colors.border }]}>
+      {props.options.map((x) => {
+        const on = x.value === props.value;
+        return (
+          <TouchableRipple
+            key={x.value}
+            accessibilityRole="radio"
+            accessibilityLabel={x.label}
+            accessibilityState={{ checked: on }}
+            aria-checked={on}
+            onPress={() => props.onChange(x.value)}
+            style={[styles.segment, { backgroundColor: (on) ? theme.colors.field : "transparent" }, (props.stretch) ? { flex: 1 } : undefined]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              {x.icon}
+              <Text style={{ fontSize: 13, color: (on) ? theme.colors.text : theme.colors.textMuted, fontFamily: (on) ? fonts.medium : fonts.regular }}>{x.label}</Text>
+            </View>
+          </TouchableRipple>
+        );
+      })}
+    </View>
+  );
 }
 
 function Check(props: { task: TaskType, onPress: () => void, size?: number }) {
@@ -139,6 +208,7 @@ function TaskRow(props: RowProps) {
   const { task, list, subtasks, fmt } = props;
   const due = formatDue(task, fmt);
   const done = subtasks.filter((x) => x.finished).length;
+  const priority = priorityOf(task);
   return (
     // (the checkbox is in the row's button, so that the whole row is highlighted under the pointer)
     <TouchableRipple
@@ -172,12 +242,15 @@ function TaskRow(props: RowProps) {
               {!!task.description && <MaterialCommunityIcons name="text" size={13} color={theme.colors.textMuted} />}
             </View>
           </View>
-          {(priorityName(task) === "High") && (
-            <MaterialCommunityIcons name="flag" size={16} color={theme.colors.warning} accessibilityLabel="High priority" />
-          )}
-          {due && (
-            <Text style={[styles.due, { color: (task.overdue && !task.finished) ? theme.colors.error : theme.colors.textMuted }]}>{due}</Text>
-          )}
+          <View style={[styles.priority, { opacity: (task.finished) ? 0.45 : 1 }]} accessibilityLabel={priorityTitle(priority)}>
+            {(priority !== "none") && (
+              <>
+                <PriorityBars priority={priority} />
+                <Text style={[styles.metaText(theme), { fontFamily: fonts.medium, color: theme.colors.textSecondary }]}>{priorityLabels[priority]}</Text>
+              </>
+            )}
+          </View>
+          <Text style={[styles.due, { color: (task.overdue && !task.finished) ? theme.colors.error : theme.colors.textMuted }]}>{due ?? ""}</Text>
         </View>
       </View>
     </TouchableRipple>
@@ -220,6 +293,16 @@ function TaskDetails(props: { task: TaskType, list?: PimCollection, subtasks: Ta
       <Text style={[styles.detailsTitle, { color: theme.colors.text }, (task.finished) ? { textDecorationLine: "line-through", color: theme.colors.textMuted } : undefined]}>
         {task.title || "(no title)"}
       </Text>
+      <View style={{ gap: 8 }}>
+        <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Priority</Text>
+        <Segmented
+          label="Priority"
+          stretch
+          value={priorityOf(task)}
+          onChange={(x) => changePriority(etebase, task, x)}
+          options={[...priorities].reverse().map((x) => ({ value: x, label: priorityLabels[x], icon: (x !== "none") ? <PriorityBars priority={x} /> : undefined }))}
+        />
+      </View>
       <View style={{ gap: 10 }}>
         {field("Due", (due) ? `${fmt.day.format(due.toJSDate())}${(due.isDate) ? "" : `, ${fmt.time(due.toJSDate())}`}` : "No date")}
         {(reminders.length > 0) && field((reminders.length === 1) ? "Reminder" : "Reminders", reminders.join(", "))}
@@ -230,7 +313,6 @@ function TaskDetails(props: { task: TaskType, list?: PimCollection, subtasks: Ta
             <Text style={{ color: theme.colors.text }}>{props.list?.name}</Text>
           </View>
         ))}
-        {field("Priority", priorityName(task))}
       </View>
       <View style={{ gap: 4 }}>
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Subtasks{(subtasks.length) ? ` · ${done} of ${subtasks.length}` : ""}</Text>
@@ -276,34 +358,38 @@ export default function TasksScreen() {
   const lists = usePimCollections(C.tasksType);
   const tasks = usePimItems(etebase, C.tasksType, TaskType.parse);
   const taskSettings = useSelector((state: StoreState) => state.settings.taskSettings);
+  const taskViews = useSelector((state: StoreState) => state.settings.taskViews) ?? {};
   const { sortBy, showCompleted } = taskSettings;
   // (a list that isn't there anymore shows all of them)
   const filter = (lists.some((x) => x.colUid === taskSettings.filterBy)) ? taskSettings.filterBy : null;
+  // How the list is grouped and filtered, which each list remembers
+  const viewKey = filter ?? "all";
+  const view = taskViews[viewKey] ?? defaultView;
+  const shownPriorities = priorities.filter((x) => view.priorities.includes(x));
   const [newTitle, setNewTitle] = React.useState("");
   const [selectedUid, setSelectedUid] = React.useState<string>();
+  // The task that was just marked as done, which can be undone
+  const [justDone, setJustDone] = React.useState<{ task: TaskType, next: TaskType | null }>();
+  const [deleteDoneShown, setDeleteDoneShown] = React.useState(false);
   const fmt = useDateFormats();
 
   const byList = React.useMemo(() => new Map(lists.map((x) => [x.colUid, x])), [lists]);
   const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
   const all = (tasks ?? []).filter((x) => !filter || (x.collectionUid === filter));
   // Subtasks are shown in their task, not on their own (unless it isn't there)
   const uids = new Set(all.map((x) => x.uid));
   const subtasksOf = (task: TaskType) => all.filter((x) => x.relatedTo === task.uid).sort(compare("title"));
   const top = all.filter((x) => !(x.relatedTo && uids.has(x.relatedTo)));
-  const sorted = [...top].sort(compare(sortBy));
-  const open = sorted.filter((x) => !x.finished);
-  const groups = [
-    { title: "Overdue", items: open.filter((x) => x.dueDate && (x.dueDate.toJSDate() < today)), alert: true },
-    { title: "Today", items: open.filter((x) => x.dueDate && (x.dueDate.toJSDate() >= today) && (x.dueDate.toJSDate() < tomorrow)) },
-    { title: "Upcoming", items: open.filter((x) => x.dueDate && (x.dueDate.toJSDate() >= tomorrow)) },
-    { title: "No date", items: open.filter((x) => !x.dueDate) },
-    { title: "Completed", items: (showCompleted) ? sorted.filter((x) => x.finished) : [] },
-  ].filter((x) => x.items.length > 0);
+  const filtering = shownPriorities.length > 0;
+  const shown = (filtering) ? top.filter((x) => shownPriorities.includes(priorityOf(x))) : top;
+  const open = shown.filter((x) => !x.finished).sort(compare(sortBy));
+  const doneShown = shown.filter((x) => x.finished).sort(compareDoneTasks);
+  const groups = groupTasks(open, view.groupBy);
+  // (the counts of the filter are of all the tasks to do, whichever are shown)
+  const openCounts = new Map(priorities.map((p) => [p, top.filter((x) => !x.finished && (priorityOf(x) === p)).length]));
   // Today's progress: what's due today or was done today
   const todays = all.filter((x) => (x.dueDate && sameDay(x.dueDate.toJSDate(), today)) || (x.finished && x.completionDate && sameDay(x.completionDate.toJSDate(), today)));
   const doneToday = todays.filter((x) => x.finished).length;
-  const doneCount = all.filter((x) => x.finished).length;
   const selected = (wide) ? all.find((x) => x.uid === selectedUid) : undefined;
 
   if (syncGate) {
@@ -325,19 +411,48 @@ export default function TasksScreen() {
 
   const addTo = filter ?? lists[0].colUid;
 
+  function setView(changed: Partial<TaskViewType>) {
+    dispatch(setSettings({ taskViews: { ...taskViews, [viewKey]: { ...view, ...changed } } }) as any);
+  }
+
+  function togglePriority(priority: Priority) {
+    setView({ priorities: (shownPriorities.includes(priority)) ? shownPriorities.filter((x) => x !== priority) : [...shownPriorities, priority] });
+  }
+
   async function add() {
-    const title = newTitle.trim();
+    const { title, priority } = parseQuickAdd(newTitle);
     if (title) {
       setNewTitle("");
-      await addTask(etebase, addTo, title);
+      await addTask(etebase, addTo, title, undefined, priority);
     }
   }
 
   async function toggle(task: TaskType) {
-    const next = await setTaskDone(etebase, task, !task.finished);
-    if (next) {
-      dispatch(pushMessage({ message: `"${next.title}" is due again ${formatDue(next, fmt) ?? ""}`, severity: "success" }) as any);
+    setJustDone(undefined);
+    const done = !task.finished;
+    const next = await setTaskDone(etebase, task, done);
+    if (done) {
+      // The Undo takes the place of the app's messages, which would cover it
+      for (let i = store.getState().messages.size; i > 0; i--) {
+        dispatch(popMessage() as any);
+      }
+      setJustDone({ task, next });
     }
+  }
+
+  async function undo() {
+    const { task, next } = justDone!;
+    setJustDone(undefined);
+    await undoDone(etebase, task, next);
+  }
+
+  // Deletes the done tasks that are shown, with their done subtasks
+  async function deleteDone() {
+    setDeleteDoneShown(false);
+    setJustDone(undefined);
+    const doneUids = new Set(doneShown.map((x) => x.uid));
+    await deletePimItems(etebase, [...doneShown, ...all.filter((x) => x.finished && x.relatedTo && doneUids.has(x.relatedTo))]);
+    dispatch(pushMessage({ message: `${doneShown.length} completed ${(doneShown.length === 1) ? "task" : "tasks"} deleted`, severity: "success" }) as any);
   }
 
   function press(task: TaskType) {
@@ -349,6 +464,23 @@ export default function TasksScreen() {
   }
 
   const listName = (filter) ? byList.get(filter)?.name : "All tasks";
+  const taskRow = (task: TaskType, idx: number) => (
+    <View key={task.uid} style={[(idx > 0) ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider } : undefined,
+      (selected?.uid === task.uid) ? { backgroundColor: theme.colors.accentTint } : undefined]}>
+      <TaskRow
+        task={task}
+        list={(!filter) ? byList.get(task.collectionUid!) : undefined}
+        subtasks={subtasksOf(task)}
+        selected={selected?.uid === task.uid}
+        fmt={fmt}
+        onToggle={toggle}
+        onPress={press}
+      />
+    </View>
+  );
+  const listBox = [styles.list, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }];
+  const hint = { fontSize: 12, color: theme.colors.textMuted };
+  const code = [styles.code, { backgroundColor: theme.colors.field, color: theme.colors.textSecondary }];
 
   return (
     <View style={{ flex: 1, flexDirection: "row" }}>
@@ -368,57 +500,128 @@ export default function TasksScreen() {
               <View style={[styles.progressBar, { width: `${doneToday / todays.length * 100}%`, backgroundColor: theme.colors.success }]} />
             </View>
           )}
-          <View style={[styles.add, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-            <MaterialCommunityIcons name="plus" size={18} color={theme.colors.textMuted} />
-            <TextInput
-              value={newTitle}
-              onChangeText={setNewTitle}
-              onSubmitEditing={add}
-              blurOnSubmit={false}
-              placeholder={`Add a task to ${byList.get(addTo)?.name}`}
-              placeholderTextColor={theme.colors.textMuted}
-              accessibilityLabel="Add a task"
-              style={[styles.addInput, { color: theme.colors.text }]}
-            />
-            <Text style={[styles.enter, { color: theme.colors.textMuted, borderColor: theme.colors.border }]}>↵</Text>
+          <View style={{ gap: 6 }}>
+            <View style={[styles.add, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+              <MaterialCommunityIcons name="plus" size={18} color={theme.colors.textMuted} />
+              <TextInput
+                value={newTitle}
+                onChangeText={setNewTitle}
+                onSubmitEditing={add}
+                blurOnSubmit={false}
+                placeholder={`Add a task to ${byList.get(addTo)?.name}`}
+                placeholderTextColor={theme.colors.textMuted}
+                accessibilityLabel="Add a task"
+                style={[styles.addInput, { color: theme.colors.text }]}
+              />
+              <Text style={[styles.enter, { color: theme.colors.textMuted, borderColor: theme.colors.border }]}>↵</Text>
+            </View>
+            <Text style={[hint, { paddingLeft: 4 }]}>
+              Set the priority as you type: <Text style={code}>!high</Text> <Text style={code}>!medium</Text> <Text style={code}>!low</Text>
+            </Text>
           </View>
-          {(groups.length === 0) && <EmptyState icon="check-all" title="Nothing to do" />}
-          {groups.map((group) => (
-            <View key={group.title} style={{ gap: 4 }} testID={`group-${group.title}`}>
-              <Text style={[styles.groupTitle, { color: (group.alert) ? theme.colors.error : theme.colors.textMuted }]}>
-                {group.title} <Text style={{ color: theme.colors.textMuted, fontFamily: fonts.regular }}>{group.items.length}</Text>
+          <View style={{ gap: 8 }}>
+            <View style={styles.controls}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Group by</Text>
+                <Segmented<TaskGroupBy>
+                  label="Group by"
+                  value={view.groupBy}
+                  onChange={(groupBy) => setView({ groupBy })}
+                  options={[{ value: "date", label: "Due date" }, { value: "priority", label: "Priority" }]}
+                />
+              </View>
+              <View style={{ flexGrow: 1 }} />
+              <View role="group" aria-label="Priority" style={styles.chips}>
+                <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginRight: 2 }}>Priority</Text>
+                {priorities.map((x) => {
+                  const on = shownPriorities.includes(x);
+                  return (
+                    <TouchableRipple
+                      key={x}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${priorityTitle(x)} (${openCounts.get(x)})`}
+                      aria-pressed={on}
+                      onPress={() => togglePriority(x)}
+                      style={[styles.chip, { borderColor: (on) ? theme.colors.accent : theme.colors.border, backgroundColor: (on) ? theme.colors.accentTint : "transparent" }]}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <PriorityBars priority={x} />
+                        <Text style={{ fontSize: 13, color: (on) ? theme.colors.text : theme.colors.textSecondary }}>{priorityLabels[x]}</Text>
+                        <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{openCounts.get(x)}</Text>
+                      </View>
+                    </TouchableRipple>
+                  );
+                })}
+                {filtering && (
+                  <TouchableRipple accessibilityRole="button" onPress={() => setView({ priorities: [] })} style={styles.clear}>
+                    <Text style={{ fontSize: 13, color: theme.colors.accentText }}>Clear</Text>
+                  </TouchableRipple>
+                )}
+              </View>
+            </View>
+            <Text style={hint}>Grouping and filter are remembered for this list ({listName}).</Text>
+            {filtering && (
+              <Text role="status" style={{ fontSize: 13, color: theme.colors.textMuted }} testID="tasks-filter-note">
+                Showing {shown.length} of {top.length} tasks · {shownPriorities.join(", ")}
               </Text>
-              <View style={[styles.list, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-                {group.items.map((task, idx) => (
-                  <View key={task.uid} style={[(idx > 0) ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider } : undefined,
-                    (selected?.uid === task.uid) ? { backgroundColor: theme.colors.accentTint } : undefined]}>
-                    <TaskRow
-                      task={task}
-                      list={(!filter) ? byList.get(task.collectionUid!) : undefined}
-                      subtasks={subtasksOf(task)}
-                      selected={selected?.uid === task.uid}
-                      fmt={fmt}
-                      onToggle={toggle}
-                      onPress={press}
-                    />
-                  </View>
-                ))}
+            )}
+          </View>
+          {(filtering && (shown.length === 0)) ? (
+            <View style={[styles.noResults, { borderColor: theme.colors.border }]}>
+              <Text style={{ color: theme.colors.textMuted }}>No tasks with these priorities.</Text>
+              <SmallButton label="Show all priorities" onPress={() => setView({ priorities: [] })} />
+            </View>
+          ) : (groups.length === 0) && <EmptyState icon="check-all" title="Nothing to do" />}
+          {groups.map((group) => (
+            <View key={group.key} style={{ gap: 4 }} testID={`group-${group.title}`}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 4 }}>
+                {group.priority && (group.priority !== "none") && <PriorityBars priority={group.priority} />}
+                <Text style={[styles.groupTitle, { paddingLeft: 0, color: (group.key === "overdue") ? theme.colors.error : theme.colors.textMuted }]}>
+                  {group.title} <Text style={{ color: theme.colors.textMuted, fontFamily: fonts.regular }}>{group.items.length}</Text>
+                </Text>
+              </View>
+              <View style={listBox}>
+                {group.items.map(taskRow)}
               </View>
             </View>
           ))}
-          <TouchableRipple
-            accessibilityRole="checkbox"
-            accessibilityLabel={`Show completed (${doneCount})`}
-            accessibilityState={{ checked: showCompleted }}
-            aria-checked={showCompleted}
-            onPress={() => dispatch(setSettings({ taskSettings: { ...taskSettings, showCompleted: !showCompleted } }) as any)}
-            style={{ alignSelf: "flex-start", borderRadius: 8, padding: 6 }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <MaterialCommunityIcons name={(showCompleted) ? "checkbox-marked" : "checkbox-blank-outline"} size={18} color={(showCompleted) ? theme.colors.accent : theme.colors.textMuted} />
-              <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Show completed ({doneCount})</Text>
+          {(doneShown.length > 0) && (
+            <View style={{ gap: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider }} testID="group-Completed">
+              <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: 4 }}>
+                <Text style={[styles.groupTitle, { flex: 1, paddingLeft: 0, color: theme.colors.textMuted }]}>
+                  Completed <Text style={{ color: theme.colors.textMuted, fontFamily: fonts.regular }}>{doneShown.length}</Text>
+                </Text>
+                <TouchableRipple
+                  accessibilityRole="checkbox"
+                  accessibilityLabel="Show completed"
+                  accessibilityState={{ checked: showCompleted }}
+                  aria-checked={showCompleted}
+                  onPress={() => dispatch(setSettings({ taskSettings: { ...taskSettings, showCompleted: !showCompleted } }) as any)}
+                  style={{ borderRadius: 8, padding: 6 }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <MaterialCommunityIcons name={(showCompleted) ? "checkbox-marked" : "checkbox-blank-outline"} size={18} color={(showCompleted) ? theme.colors.accent : theme.colors.textMuted} />
+                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Show completed</Text>
+                  </View>
+                </TouchableRipple>
+                <TouchableRipple accessibilityRole="button" onPress={() => setDeleteDoneShown(true)} style={styles.clear}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <MaterialCommunityIcons name="delete-outline" size={16} color={theme.colors.textMuted} />
+                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Delete completed</Text>
+                  </View>
+                </TouchableRipple>
+              </View>
+              {(showCompleted) ? (
+                <View style={listBox}>
+                  {doneShown.map(taskRow)}
+                </View>
+              ) : (
+                <Text style={{ fontSize: 13, color: theme.colors.textMuted, paddingLeft: 4 }}>
+                  {doneShown.length} completed {(doneShown.length === 1) ? "task" : "tasks"} hidden
+                </Text>
+              )}
             </View>
-          </TouchableRipple>
+          )}
         </View>
       </ScrollView>
       {selected && (
@@ -434,6 +637,29 @@ export default function TasksScreen() {
           />
         </ScrollView>
       )}
+      <ConfirmationDialog
+        title="Delete completed tasks"
+        visible={deleteDoneShown}
+        labelOk="Delete"
+        onOk={deleteDone}
+        onCancel={() => setDeleteDoneShown(false)}
+      >
+        <Text>
+          Delete the {(doneShown.length === 1) ? "completed task" : `${doneShown.length} completed tasks`}{(filtering) ? ` with ${shownPriorities.join(", ")} priority` : ""} in {listName}? This can't be undone.
+        </Text>
+      </ConfirmationDialog>
+      <Snackbar
+        visible={!!justDone}
+        onDismiss={() => setJustDone(undefined)}
+        duration={5000}
+        wrapperStyle={{ zIndex: 5 }}
+        style={{ backgroundColor: theme.colors.chipActive }}
+        action={{ label: "Undo", onPress: undo, textColor: theme.colors.onChipActiveAccent }}
+      >
+        <Text style={{ color: theme.colors.onChipActive }}>
+          “{justDone?.task.title}” completed{(justDone?.next) ? `, due again ${formatDue(justDone.next, fmt) ?? ""}` : ""}
+        </Text>
+      </Snackbar>
     </View>
   );
 }
@@ -543,6 +769,79 @@ const styles = {
     due: {
       fontSize: 12,
       fontFamily: mono,
+      minWidth: 72,
+      textAlign: "right",
+    },
+    // (as wide when there's no priority, so that the dates stay in a column)
+    priority: {
+      width: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    bars: {
+      width: 14,
+      height: 13,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+    },
+    bar: {
+      width: 3,
+      borderRadius: 1,
+    },
+    segmented: {
+      flexDirection: "row",
+      padding: 3,
+      gap: 2,
+      borderWidth: 1,
+      borderRadius: 10,
+    },
+    segment: {
+      height: 30,
+      paddingHorizontal: 12,
+      borderRadius: 7,
+      justifyContent: "center",
+    },
+    controls: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      columnGap: 16,
+      rowGap: 10,
+    },
+    chips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 6,
+    },
+    chip: {
+      height: 32,
+      paddingHorizontal: 10,
+      borderWidth: 1,
+      borderRadius: 16,
+      justifyContent: "center",
+    },
+    clear: {
+      height: 32,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+      justifyContent: "center",
+    },
+    code: {
+      fontFamily: mono,
+      fontSize: 11,
+      paddingHorizontal: 5,
+      borderRadius: 4,
+    },
+    noResults: {
+      padding: 28,
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderRadius: 12,
+      alignItems: "center",
+      gap: 10,
     },
     detailsTitle: {
       fontFamily: fonts.semibold,

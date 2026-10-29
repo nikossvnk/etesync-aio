@@ -395,11 +395,19 @@ export interface TaskSettingsType {
   showCompleted: boolean;
 }
 
+// How a task list is grouped and which priorities it shows (none: all of them)
+export interface TaskViewType {
+  groupBy: "date" | "priority";
+  priorities: ("high" | "medium" | "low" | "none")[];
+}
+
 export interface SettingsType {
   // How dates and times are shown in the calendar and the tasks (and which day weeks start on):
   // "en-gb" or "en-us", like in the web app
   locale: string;
   taskSettings: TaskSettingsType;
+  // The view of each task list, by its uid ("all" for all of them)
+  taskViews: { [list: string]: TaskViewType };
   calendarView: "month" | "week" | "day" | "agenda";
   // The calendars that are hidden (by their uid, "birthdays" for the birthdays of the contacts)
   hiddenCalendars: string[];
@@ -443,6 +451,7 @@ export const settingsReducer = handleActions(
       sortBy: "smart",
       showCompleted: false,
     },
+    taskViews: {},
     calendarView: "month",
     hiddenCalendars: [],
     showRepeating: false,

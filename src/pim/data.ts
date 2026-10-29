@@ -184,6 +184,24 @@ export async function savePimItem(etebase: Etebase.Account, colUid: string, item
   item.itemUid = eteItem.uid;
 }
 
+// Deletes several items, as one change per collection
+export async function deletePimItems(etebase: Etebase.Account, items: PimType[]) {
+  const byCollection = new Map<string, PimType[]>();
+  for (const item of items) {
+    byCollection.set(item.collectionUid!, [...(byCollection.get(item.collectionUid!) ?? []), item]);
+  }
+  const mtime = (new Date()).getTime();
+  for (const [colUid, colItems] of byCollection) {
+    const { col, itemMgr } = loadCollection(etebase, colUid);
+    const eteItems = colItems.map((x) => findItem(etebase, colUid, x.itemUid!)?.item).filter((x) => x !== undefined);
+    for (const eteItem of eteItems) {
+      eteItem.setMeta({ ...eteItem.getMeta(), mtime });
+      eteItem.delete(true);
+    }
+    await saveItemsLocally(etebase, col, itemMgr, eteItems);
+  }
+}
+
 export async function deletePimItem(etebase: Etebase.Account, item: PimType) {
   const loaded = findItem(etebase, item.collectionUid!, item.itemUid!);
   if (!loaded) {

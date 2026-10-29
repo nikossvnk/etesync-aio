@@ -140,16 +140,16 @@ function TaskRow(props: RowProps) {
   const due = formatDue(task, fmt);
   const done = subtasks.filter((x) => x.finished).length;
   return (
-    <View style={styles.row}>
-      <Check task={task} onPress={() => props.onToggle(task)} />
-      <TouchableRipple
-        style={{ flex: 1 }}
-        accessibilityRole="button"
-        accessibilityLabel={`Task ${task.title}`}
-        aria-selected={props.selected}
-        onPress={() => props.onPress(task)}
-      >
-        <View style={styles.rowInner}>
+    // (the checkbox is in the row's button, so that the whole row is highlighted under the pointer)
+    <TouchableRipple
+      accessibilityRole="button"
+      accessibilityLabel={`Task ${task.title}`}
+      aria-selected={props.selected}
+      onPress={() => props.onPress(task)}
+    >
+      <View style={styles.row}>
+        <Check task={task} onPress={() => props.onToggle(task)} />
+        <View style={[styles.rowInner, { flex: 1 }]}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={2} style={[styles.title, { color: (task.finished) ? theme.colors.textMuted : theme.colors.text },
               (task.finished) ? { textDecorationLine: "line-through" } : undefined]}>
@@ -179,8 +179,8 @@ function TaskRow(props: RowProps) {
             <Text style={[styles.due, { color: (task.overdue && !task.finished) ? theme.colors.error : theme.colors.textMuted }]}>{due}</Text>
           )}
         </View>
-      </TouchableRipple>
-    </View>
+      </View>
+    </TouchableRipple>
   );
 }
 

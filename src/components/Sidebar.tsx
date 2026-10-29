@@ -544,6 +544,33 @@ export default function Sidebar() {
     { key: "contacts", label: "Contacts", icon: "account-outline", screen: "Contacts" },
   ];
 
+  function goTo(screen: string) {
+    setQuery("");
+    navigate(screen);
+  }
+
+  // Alt+1 to Alt+5 go to the sections, in their order (by the key's place, which the keyboard's
+  // layout doesn't change)
+  const goToRef = React.useRef(goTo);
+  goToRef.current = goTo;
+  const screens = sections.map((x) => x.screen).join(" ");
+  React.useEffect(() => {
+    if (Platform.OS !== "web") {
+      return undefined;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      const number = /^Digit([1-9])$/.exec(e.code);
+      const screen = (number) ? screens.split(" ")[Number(number[1]) - 1] : undefined;
+      if (screen && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        goToRef.current(screen);
+      }
+    };
+    // (before the fields get it, which keep it to themselves)
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [screens]);
+
   const borderColor = theme.colors.border;
 
   return (
@@ -583,10 +610,7 @@ export default function Sidebar() {
               label={x.label}
               accessibilityLabel={x.label}
               selected={selected}
-              onPress={() => {
-                setQuery("");
-                navigate(x.screen);
-              }}
+              onPress={() => goTo(x.screen)}
               count={x.count}
               left={<MaterialCommunityIcons name={x.icon as any} size={18} color={(selected) ? theme.colors.accent : theme.colors.textMuted} style={styles.icon} />}
               right={(x.badge) ? (

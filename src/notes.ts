@@ -8,7 +8,7 @@ import { CachedCollection, CachedItem } from "./store/reducers";
 import { setCacheItem, unsetCacheItem, unsetSyncItem } from "./store/actions";
 import { saveItemsLocally } from "./sync/SyncManager";
 import { findCollection } from "./cached";
-import { newNotes } from "./newNotes";
+import { newNotes, openInEditor } from "./newNotes";
 import { NoteMetadata } from "./helpers";
 
 export const untitled = "Untitled";
@@ -68,6 +68,39 @@ export async function moveNote(etebase: Etebase.Account, from: CachedCollection,
     newNotes.add(newItem.uid);
   }
   return newItem.uid;
+}
+
+// The open editors, by the uid of their note: saving what was typed and isn't saved yet, and whether
+// the note is being edited (rather than viewed)
+export const openEditors = new Map<string, { save: () => Promise<void>, editing: () => boolean }>();
+
+// Moves notes, given as "colUid/itemUid", to another notebook (the ones that are in it already stay
+// as they are), saving first what was typed in them and isn't saved yet. Returns the notes' new keys.
+export async function moveNotes(etebase: Etebase.Account, notes: Iterable<string>, toUid: string) {
+  const moved = new Map<string, string>();
+  for (const note of notes) {
+    const [colUid, itemUid] = note.split("/");
+    if (colUid === toUid) {
+      continue;
+    }
+    const editor = openEditors.get(itemUid);
+    await editor?.save();
+    const state = store.getState();
+    const cachedItem = state.cache.items.get(colUid)?.get(itemUid);
+    const from = state.cache.collections.get(colUid);
+    const to = state.cache.collections.get(toUid);
+    if (!cachedItem || cachedItem.isDeleted || !from || !to) {
+      continue;
+    }
+    const queued = state.sync.items.hasIn([colUid, itemUid]);
+    const newUid = await moveNote(etebase, from, colUid, cachedItem, to, queued);
+    // (a note that was being edited stays in the editor when it's opened where it was moved to)
+    if (editor?.editing()) {
+      openInEditor.add(newUid);
+    }
+    moved.set(note, `${toUid}/${newUid}`);
+  }
+  return moved;
 }
 
 // Changes notes, given as "colUid/itemUid", and saves the ones it changed (the change returns whether

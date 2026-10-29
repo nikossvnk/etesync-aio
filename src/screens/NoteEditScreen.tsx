@@ -23,7 +23,7 @@ import Markdown from "../widgets/Markdown";
 import { useSelector, useDispatch } from "react-redux";
 import { pushMessage, setCacheItem, setSettings, setSyncItem, unsetCacheItem } from "../store/actions";
 import { newNotes, openInEditor } from "../newNotes";
-import { isPinned, moveNote, nameFromContent, noteName, setPinned, untitled } from "../notes";
+import { isPinned, moveNote, nameFromContent, noteName, openEditors, setPinned, untitled } from "../notes";
 import { requestSync, saveItemsLocally } from "../sync/SyncManager";
 import { loadCollection } from "../cached";
 import LoadingIndicator from "../widgets/LoadingIndicator";
@@ -100,6 +100,25 @@ export default function NoteEditScreen(props: PropsType) {
       onLeaveRef.current?.();
     };
   }, []);
+
+  // Others (e.g. moving the note from the list) can save what was typed and isn't saved yet
+  React.useEffect(() => {
+    const editor = {
+      save: async () => {
+        persistItem.cancel();
+        if (dirtyRef.current) {
+          await saveLocally();
+        }
+      },
+      editing: () => !viewMode,
+    };
+    openEditors.set(itemUid, editor);
+    return () => {
+      if (openEditors.get(itemUid) === editor) {
+        openEditors.delete(itemUid);
+      }
+    };
+  });
 
   // Escape ends editing, on the web (unless it closes a menu or a dialog)
   React.useEffect(() => {

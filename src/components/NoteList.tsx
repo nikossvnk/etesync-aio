@@ -255,6 +255,8 @@ interface PinnedNotesPropsType {
   linkAction?: any;
   onPress: (note: string, e?: any) => boolean;
   onLongPress?: (note: string) => void;
+  // A right click on a card (on the web)
+  onContextMenu?: (note: string, e: any) => void;
 }
 
 // The pinned notes above the others, as cards two per row, under a title that folds them away. Then
@@ -298,7 +300,7 @@ export function PinnedNotes(props: PinnedNotesPropsType) {
                 const collection = cacheCollections.get(item.colUid);
                 return (
                   // (on the web the card is in a link, so it's in a cell that takes its half of the row)
-                  <View key={item.uid} style={styles.cardCell}>
+                  <View key={item.uid} style={styles.cardCell} {...((props.onContextMenu) ? { onContextMenu: (e: any) => props.onContextMenu!(key, e) } : {})}>
                     <NoteCard
                       item={item}
                       itemMgr={props.getItemMgr(item.colUid)}

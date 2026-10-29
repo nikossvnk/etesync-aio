@@ -266,6 +266,17 @@ export default function CalendarScreen() {
           </TouchableRipple>
         ))}
       </View>
+      <TouchableRipple
+        accessibilityRole="button"
+        accessibilityLabel="Import"
+        onPress={() => dialogs.importFiles()}
+        style={[styles.todayButton, { borderColor: theme.colors.border }]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <MaterialCommunityIcons name="tray-arrow-up" size={16} color={theme.colors.textSecondary} />
+          {wide && <Text style={{ color: theme.colors.text, fontSize: 13 }}>Import</Text>}
+        </View>
+      </TouchableRipple>
       <AccentButton icon="plus" label="New event" onPress={() => newEvent()} />
     </View>
   );

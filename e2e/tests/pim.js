@@ -347,7 +347,7 @@ run(async () => {
   await vis('input[aria-label="Add a task"]').press("Enter"); await wait(2000);
   check("a task added from the list is shown", await A.has(`Call mom ${n}`));
   await p.getByRole("checkbox", { name: `Done: Buy milk ${n}` }).click(); await wait(2000);
-  check("a done task leaves the list", !(await A.has(`Buy milk ${n}`)));
+  check("a done task leaves the list", (await p.getByRole("button", { name: `Task Buy milk ${n}` }).count()) === 0, await A.text());
   check("and both are on the server: the new one to do, the other one done", await waitForServer(etebase, (s) => {
     const all = s.filter((x) => x.type === types.tasks).flatMap((x) => x.contents);
     return all.some((c) => c.includes(`SUMMARY:Call mom ${n}`) && c.includes("STATUS:NEEDS-ACTION")) &&

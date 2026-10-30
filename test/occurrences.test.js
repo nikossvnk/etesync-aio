@@ -1,6 +1,7 @@
 // The times of events that the calendar shows (occurrencesBetween): a repeating event that started
 // long ago is shown at the right times, with its changed and cancelled times, without working out
 // each of its times since it started; and one whose times can't all be worked out isn't shown twice.
+// Also which old events "Delete old events" deletes.
 process.env.TZ = "UTC";
 require("./register");
 const test = require("node:test");
@@ -96,4 +97,19 @@ test("an event that doesn't repeat is shown when it's in the range, and not othe
   const event = eventOf(["BEGIN:VEVENT", "UID:once", "DTSTART:20261021T130000Z", "DTEND:20261021T140000Z", "SUMMARY:Lunch", "END:VEVENT"]);
   assert.deepEqual(shown(occurrencesBetween([event], calendars, ...week)), ["2026-10-21T13:00 Lunch"]);
   assert.deepEqual(occurrencesBetween([event], calendars, new Date("2026-10-26T00:00:00Z"), new Date("2026-11-02T00:00:00Z")), []);
+});
+
+test("the old events that are deleted are the ones that happened once and ended before the date", () => {
+  const once = (uid, start, end) => eventOf(["BEGIN:VEVENT", `UID:${uid}`, "DTSTAMP:20241001T000000Z", `DTSTART:${start}`, `DTEND:${end}`, `SUMMARY:${uid}`, "END:VEVENT"]);
+  const events = [
+    once("old", "20240110T100000Z", "20240110T110000Z"),
+    once("ends-after", "20241020T100000Z", "20241030T100000Z"),
+    once("recent", "20260901T100000Z", "20260901T110000Z"),
+    eventOf(["BEGIN:VEVENT", "UID:weekly", "DTSTAMP:20241001T000000Z", "DTSTART:20240110T100000Z", "DTEND:20240110T110000Z",
+      "RRULE:FREQ=WEEKLY;COUNT=3", "SUMMARY:weekly", "END:VEVENT"]),
+    eventOf(["BEGIN:VEVENT", "UID:allday", "DTSTAMP:20241001T000000Z", "DTSTART;VALUE=DATE:20241025", "DTEND;VALUE=DATE:20241026", "SUMMARY:allday", "END:VEVENT"]),
+  ];
+  const before = new Date("2024-10-27T00:00:00Z");
+  const { oneTimeEventsBefore } = require("../src/pim/occurrences");
+  assert.deepEqual(oneTimeEventsBefore(events, before).map((x) => x.uid), ["old", "allday"]);
 });

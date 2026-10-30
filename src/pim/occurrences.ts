@@ -227,6 +227,12 @@ function lengthOf(event: EventType) {
   }
 }
 
+// The events that don't repeat and ended before the date (the ones that repeat are left out, even when
+// they ended long ago)
+export function oneTimeEventsBefore(events: EventType[], before: Date) {
+  return events.filter((x) => !x.isRecurring() && ((x.endDate ?? x.startDate)?.toJSDate() < before));
+}
+
 // The occurrences that are on a day (all day ones end at the start of the day after their last one)
 export function onDay(occurrences: Occurrence[], day: Date) {
   const next = addDays(day, 1);

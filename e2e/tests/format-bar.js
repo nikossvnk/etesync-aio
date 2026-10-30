@@ -1,5 +1,6 @@
 // Clicking a note opens it in the editor (but not selecting its text, or ticking a checkbox), and
-// the editor's bar formats the Markdown around the selection
+// the editor's bar formats the Markdown around the selection, where Markdown reads it (a whole line's
+// strikethrough is struck through in the viewer)
 const { launch, session, run, check, api, unique } = require("../lib");
 run(async () => {
   const n = unique();
@@ -58,15 +59,25 @@ run(async () => {
     await press("Heading");
     check(`${tag}: heading makes the line a heading`, (await textarea.inputValue()).startsWith("# make _this_ bold"));
 
+    // Strikethrough of a whole line, chosen with its line break (as three clicks do): the markers go
+    // around its text, after the task's marker, where Markdown reads them
+    const line = (await textarea.inputValue()).indexOf("- [ ] second line");
+    await select(line, line + "- [ ] second line\n".length);
+    await press("Strikethrough");
+    check(`${tag}: strikethrough of a whole line goes around its text`, (await textarea.inputValue()).includes("\n- [ ] ~~second line~~\n"), await textarea.inputValue());
+
     // Shown formatted in the viewer
     await A.btn(/^view mode$/i).click(); await A.wait(1000);
     check(`${tag}: the viewer shows the heading and the tasks`, await A.p.locator('[data-testid="note-viewer"] [role="checkbox"] >> visible=true').count() === 2 &&
       (await A.viewerText()).includes("make this bold"));
+    const decoration = await A.p.locator('[data-testid="note-viewer"] >> text=second line').first()
+      .evaluate((el) => getComputedStyle(el).textDecorationLine);
+    check(`${tag}: and the struck line struck through`, decoration.includes("line-through"), decoration);
 
     // Leaving the note uploads it
     await A.back(); await A.wait(6000);
     const saved = await server();
-    check(`${tag}: the ticked task and the formatting are saved to the server`, saved === "# make _this_ bold\n- [ ] second line\n- [x] a task", JSON.stringify(saved));
+    check(`${tag}: the ticked task and the formatting are saved to the server`, saved === "# make _this_ bold\n- [ ] ~~second line~~\n- [x] a task", JSON.stringify(saved));
 
     // Back to how it was for the other layout
     await api.setNoteContent("My Notes", name, "make this bold\nsecond line\n- [ ] a task");

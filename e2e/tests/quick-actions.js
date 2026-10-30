@@ -1,4 +1,5 @@
-// Small things of the wide layout: Alt+1 to Alt+5 go to the sections of the sidebar, the calendar's
+// Small things of the wide layout: Alt+1 to Alt+5 go to the sections of the sidebar, ? and Ctrl+/
+// show the keyboard shortcuts, the calendar's
 // Import button imports a file into the calendar, and the rows of the tasks are one button (the
 // whole row is highlighted under the pointer) with the checkbox in it. It uses an account of its own.
 const { launch, session, run, check, unique, newAccount, waitFor, collectionOf, Etebase } = require("../lib");
@@ -30,6 +31,29 @@ run(async () => {
   check("also while typing in a field", path() === "/tasks", path());
   await A.p.keyboard.press("Control+Alt+1"); await A.wait(1000);
   check("but not with ctrl too", path() === "/tasks", path());
+
+  // The list of the shortcuts
+  const shortcuts = A.p.locator('[data-testid="shortcuts"] >> visible=true');
+  const closeShortcuts = async () => { await shortcuts.getByRole("button", { name: "Close" }).first().click(); await A.wait(600); };
+  await A.vis('input[aria-label="Search"]').fill("");
+  await A.vis('input[aria-label="Search"]').press("?"); await A.wait(600);
+  check("? in a field is only a question mark", (await shortcuts.count() === 0) && ((await A.vis('input[aria-label="Search"]').inputValue()) === "?"));
+  await A.p.keyboard.press("Control+/"); await A.wait(800);
+  const list = (await shortcuts.count()) ? await shortcuts.innerText() : "";
+  check("Ctrl+/ shows the shortcuts, also while typing", list.includes("Alt") && list.includes("Bookmarks") && list.includes("!high"), list);
+  await closeShortcuts();
+  await A.vis('input[aria-label="Search"]').fill("");
+  await A.p.locator("body").click({ position: { x: 700, y: 880 } });
+  await A.p.keyboard.press("?"); await A.wait(800);
+  check("? shows them when not typing", await shortcuts.count() === 1);
+  await closeShortcuts();
+  await A.p.getByRole("button", { name: "Account menu" }).click(); await A.wait(600);
+  await A.p.getByRole("menuitem", { name: "Keyboard shortcuts" }).click(); await A.wait(800);
+  check("and so does the account menu", await shortcuts.count() === 1);
+  await closeShortcuts();
+  await A.p.getByRole("link", { name: "Keyboard shortcuts" }).click(); await A.wait(800);
+  check("and the link under the tasks' box", await shortcuts.count() === 1);
+  await closeShortcuts();
 
   // Importing from the calendar's bar
   await A.p.keyboard.press("Alt+1"); await A.wait(2000);

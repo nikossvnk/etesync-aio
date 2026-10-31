@@ -15,7 +15,7 @@ async function notebooks(etebase) {
 
 run(async () => {
   const n = unique();
-  const account = await newAccount("aio-nb");
+  const account = await newAccount("desktop-nb");
   const { etebase } = account;
   const b = await launch();
   const A = await session(b, "A");

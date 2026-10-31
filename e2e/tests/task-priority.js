@@ -23,7 +23,7 @@ async function taskOf(etebase, title) {
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio-prio");
+  const { username, password, etebase } = await newAccount("desktop-prio");
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });
   const { p, vis, wait } = A;

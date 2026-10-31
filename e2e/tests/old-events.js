@@ -17,7 +17,7 @@ async function titles(etebase) {
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio-old");
+  const { username, password, etebase } = await newAccount("desktop-old");
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });
   const { p, wait } = A;

@@ -31,7 +31,7 @@ async function handed() {
 
 run(async () => {
   const n = unique();
-  const account = await newAccount("aio-remind");
+  const account = await newAccount("desktop-remind");
   const { etebase } = account;
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });

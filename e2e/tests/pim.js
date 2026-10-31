@@ -49,7 +49,7 @@ const usDate = (d) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullY
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio");
+  const { username, password, etebase } = await newAccount("desktop");
 
   const b = await launch();
   const A = await session(b, "A", { width: 1400, height: 900 });

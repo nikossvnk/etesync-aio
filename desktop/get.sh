@@ -15,7 +15,9 @@ set -eu
 # script breaks off
 main() {
     releases="${RELEASES:-https://github.com/nikossvnk/etesync-aio/releases}"
-    installed_file="${XDG_DATA_HOME:-$HOME/.local/share}/etesync-aio-web/VERSION"
+    installed_file="${XDG_DATA_HOME:-$HOME/.local/share}/etesync-desktop/VERSION"
+    # (where versions before 0.1.11 were installed)
+    [ -f "$installed_file" ] || installed_file="${XDG_DATA_HOME:-$HOME/.local/share}/etesync-aio-web/VERSION"
 
     for cmd in curl tar bash python3; do
         command -v "$cmd" >/dev/null 2>&1 || fail "Missing $cmd, it's needed to install EteSync Desktop"

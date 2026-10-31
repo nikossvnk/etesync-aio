@@ -29,7 +29,7 @@ const icalDate = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDa
 
 run(async () => {
   const n = unique();
-  const account = await newAccount("aio-many");
+  const account = await newAccount("desktop-many");
   const { etebase } = account;
 
   const b = await launch();

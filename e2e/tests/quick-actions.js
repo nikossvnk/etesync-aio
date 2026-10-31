@@ -13,7 +13,7 @@ async function contents(etebase, type) {
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio-quick");
+  const { username, password, etebase } = await newAccount("desktop-quick");
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });
   await A.login({ username, password });

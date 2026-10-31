@@ -17,20 +17,20 @@ import { Title } from "./widgets/Typography";
 import ScrollView from "./widgets/ScrollView";
 import { logger, LogLevel, getLogs } from "./logging";
 import Container from "./widgets/Container";
-import { expo } from "../app.json";
 import * as C from "./constants";
 import { setSettings, addError, popError, login } from "./store/actions";
 import LogoutDialog from "./components/LogoutDialog";
 import ConfirmationDialog from "./widgets/ConfirmationDialog";
 import PasswordInput from "./widgets/PasswordInput";
 import { useCredentials } from "./credentials";
+import { appVersion } from "./appVersion";
 
 // Opens a new issue about the crash, with what went wrong filled in (it's only sent once it's
 // submitted there). Without the logs, as issues are public: they can be added by hand.
 function reportCrash(error: Error) {
   const title = encodeURIComponent(`Crash: ${error.message}`.slice(0, 200));
   const body = encodeURIComponent([
-    `Version: ${expo.version}`,
+    `Version: ${appVersion ?? "unknown"}`,
     "",
     "What happened before the crash:",
     "",

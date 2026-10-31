@@ -14,6 +14,7 @@ import Drawer from "./Drawer";
 import { useWebScrollbars } from "./webScrollbars";
 import SettingsGate from "./SettingsGate";
 import { setupExternalLinks } from "./externalLinks";
+import { loadAppVersion } from "./appVersion";
 
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-gesture-handler";
@@ -33,6 +34,8 @@ import { IBMPlexSans_700Bold } from "@expo-google-fonts/ibm-plex-sans/700Bold";
 enableScreens();
 // (in the installed app, links to other sites open in the default browser)
 setupExternalLinks();
+// (known from the start, for a crash report)
+loadAppVersion();
 
 const DrawerNavigation = createDrawerNavigator();
 

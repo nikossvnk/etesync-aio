@@ -52,7 +52,7 @@ const icalDate = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDa
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio-rec");
+  const { username, password, etebase } = await newAccount("desktop-rec");
 
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 }, { timezoneId: "Europe/Berlin" });

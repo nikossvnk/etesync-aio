@@ -37,6 +37,8 @@ cp desktop/serve.py desktop/install.sh desktop/etesync-desktop "$STAGE/"
 cp assets/icon.png "$STAGE/icon.png"
 cp -r LICENSES "$STAGE/LICENSES"
 echo "$VERSION" > "$STAGE/VERSION"
+# (the app reads it from there, for its About page, see src/appVersion.ts)
+echo "$VERSION" > "$STAGE/site/version.txt"
 cat > "$STAGE/README.txt" <<README
 EteSync Desktop $VERSION
 

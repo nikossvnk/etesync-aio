@@ -17,9 +17,9 @@ import PrettyFingerprint from "./widgets/PrettyFingerprint";
 
 import LogoutDialog from "./components/LogoutDialog";
 import { helpLinks, Logo } from "./components/Auth";
-import { expo } from "../app.json";
 
 import * as C from "./constants";
+import { useAppVersion } from "./appVersion";
 import { useCredentials } from "./credentials";
 import { serverName } from "./helpers";
 import { RootStackParamList } from "./RootStackParamList";
@@ -112,6 +112,7 @@ export default function Drawer(props: PropsType) {
   const etebase = useCredentials();
   const loggedIn = !!etebase;
   const syncCount = useSelector((state: StoreState) => state.syncCount);
+  const version = useAppVersion();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const current = currentScreen(props.state);
@@ -182,7 +183,7 @@ export default function Drawer(props: PropsType) {
         {helpLinks.map((x) => (
           <Item key={x.title} label={x.title} icon={x.icon} external onPress={() => Linking.openURL(x.link)} />
         ))}
-        <Text style={[styles.version, { color: theme.colors.disabled }]}>Version {expo.version}</Text>
+        <Text style={[styles.version, { color: theme.colors.disabled }]}>Version {version}</Text>
       </ScrollView>
 
       {loggedIn && <FingerprintDialog visible={showFingerprint} onDismiss={() => setShowFingerprint(false)} />}

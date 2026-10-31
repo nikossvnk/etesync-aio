@@ -8,9 +8,9 @@ import { Title } from "../widgets/Typography";
 import Container from "../widgets/Container";
 import Link from "../widgets/Link";
 
-import { expo } from "../../app.json";
 import * as C from "../constants";
 import { useTheme } from "../theme";
+import { useAppVersion } from "../appVersion";
 
 import * as licenses from "../../licenses.json";
 
@@ -41,13 +41,14 @@ function generateRenderLicenseItem(pkgLicenses: any) {
 
 export default function AboutScreen() {
   const theme = useTheme();
+  const version = useAppVersion();
 
   return (
     <FlatList
       style={{ backgroundColor: theme.colors.surface }}
       ListHeaderComponent={() => (
         <Container>
-          <Title style={{ textAlign: "center" }}>{C.appName} {expo.version}</Title>
+          <Title style={{ textAlign: "center" }}>{C.appName} Desktop {version}</Title>
           <Link
             to={C.sourceCode}
             external

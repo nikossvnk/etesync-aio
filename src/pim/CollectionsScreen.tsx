@@ -22,13 +22,16 @@ import PrettyFingerprint from "../widgets/PrettyFingerprint";
 import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
 import { fonts, useTheme } from "../theme";
+import * as C from "../constants";
 import {
   accessNames, CollectionInfo, deleteCollection, exportCollection, exportExtension, fetchUserKey, inviteMember, Kind, kindOrder, kinds,
   leaveCollection, listMembers, Member, removeMember, saveCollection, setMemberAccess, useCollectionInfos,
 } from "./collections";
 import { Button, DialogInput, Labelled, SwatchPicker, useDialogs } from "./Dialogs";
 import { formatChanged, useDateFormats } from "./format";
-import { initials } from "./occurrences";
+import { initials, oneTimeEventsBefore } from "./occurrences";
+import { deletePimItems, usePimItems } from "./data";
+import { EventType } from "./pim-types";
 import { mono, tint } from "./style";
 
 function host(url: string) {
@@ -48,6 +51,7 @@ export function CollectionMenu(props: { info: CollectionInfo, onEdit?: () => voi
   const dialogs = useDialogs();
   const [open, setOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [deletingOld, setDeletingOld] = React.useState(false);
   const { info } = props;
   const kind = kinds[info.kind];
   const admin = info.accessLevel === Etebase.CollectionAccessLevel.Admin;
@@ -92,13 +96,53 @@ export function CollectionMenu(props: { info: CollectionInfo, onEdit?: () => voi
           close();
           dialogs.importFiles(info.colUid);
         }} />}
+        {(info.kind === "calendar") && (info.accessLevel !== Etebase.CollectionAccessLevel.ReadOnly) && <MenuItem icon="delete-clock-outline" title="Delete old events…" onPress={() => {
+          close();
+          setDeletingOld(true);
+        }} />}
         <MenuItem icon={(admin) ? "delete-outline" : "exit-run"} title={(admin) ? `Delete ${kind.noun}…` : `Leave ${kind.noun}…`} onPress={() => {
           close();
           setDeleting(true);
         }} />
       </Menu>
       <DeleteDialog info={info} visible={deleting} onDone={() => setDeleting(false)} />
+      {deletingOld && <DeleteOldEvents info={info} onClose={() => setDeletingOld(false)} />}
     </>
+  );
+}
+
+// Deleting a calendar's events that ended more than a year ago, after asking (only the ones that
+// don't repeat)
+function DeleteOldEvents(props: { info: CollectionInfo, onClose: () => void }) {
+  const dispatch = useDispatch();
+  const etebase = useCredentials()!;
+  const events = usePimItems(etebase, C.calendarType, EventType.parse);
+  const yearAgo = new Date();
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const old = oneTimeEventsBefore((events ?? []).filter((x) => x.collectionUid === props.info.colUid), yearAgo);
+  const name = props.info.name;
+
+  async function remove() {
+    await deletePimItems(etebase, old);
+    props.onClose();
+    dispatch(pushMessage({ message: `${old.length} old ${(old.length === 1) ? "event" : "events"} of ${name} deleted`, severity: "success" }) as any);
+  }
+
+  return (
+    <ConfirmationDialog
+      title="Delete old events"
+      visible
+      labelOk={(old.length) ? "Delete" : "OK"}
+      onOk={(old.length) ? remove : props.onClose}
+      onCancel={props.onClose}
+    >
+      <Text>
+        {(!events) ? "Loading…" : (old.length) ?
+          `Delete the ${(old.length === 1) ? "event" : `${old.length} events`} of ${name} that ended more than a year ago? This can't be undone.` :
+          `${name} has no events that ended more than a year ago.`}
+        {" "}Only events that happen once are deleted: repeating events are kept, even old ones.
+      </Text>
+    </ConfirmationDialog>
   );
 }
 

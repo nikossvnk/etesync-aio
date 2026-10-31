@@ -57,7 +57,7 @@ exports.waitFor = async (fn, seconds = 20) => {
 // data and check the server's side). The app's session logs in with s.login(account).
 exports.newAccount = async (prefix) => {
   const username = `${prefix}-${exports.unique()}`;
-  const password = "aio-tester-password";
+  const password = "desktop-tester-password";
   const etebase = await Etebase.Account.signup({ username, email: `${username}@example.invalid` }, password, config.serverUrl);
   return { username, password, etebase };
 };

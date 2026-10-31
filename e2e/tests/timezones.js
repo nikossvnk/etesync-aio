@@ -47,7 +47,7 @@ function momentOf(zone, day, time) {
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio-tz");
+  const { username, password, etebase } = await newAccount("desktop-tz");
   const b = await launch();
 
   // A device in Indiana

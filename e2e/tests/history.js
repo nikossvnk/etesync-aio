@@ -41,7 +41,7 @@ const ics = (uid, title, location) => [
 
 run(async () => {
   const n = unique();
-  const { username, password, etebase } = await newAccount("aio-hist");
+  const { username, password, etebase } = await newAccount("desktop-hist");
 
   const b = await launch();
   const A = await session(b, "A", { width: 1440, height: 900 });

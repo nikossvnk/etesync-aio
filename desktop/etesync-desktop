@@ -70,7 +70,7 @@ stop() {
     if [ -f "$PID_FILE" ] && kill "$(cat "$PID_FILE")" 2>/dev/null; then
         echo "Stopped EteSync Desktop's server"
     elif [ "$(server)" = "ours" ]; then
-        echo "EteSync Desktop runs as a service, stop it with: systemctl --user stop etesync-aio-web"
+        echo "EteSync Desktop runs as a service, stop it with: systemctl --user stop etesync-desktop"
     fi
     rm -f "$PID_FILE"
 }

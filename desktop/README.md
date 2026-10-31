@@ -38,7 +38,7 @@ Options of `install.sh` (environment variables, also passed on by `get.sh`, e.g.
 | `BROWSER` | the first one found of Chromium, Chrome, Brave, Edge, Firefox | The browser the shortcut opens. Chromium-based browsers open it in an app window, Firefox in a new window |
 | `LOW_MEMORY` | `1` | Chromium-based browsers get flags that make them use a bit less memory (no spare page process, at most two, no background downloads, updates or sync); `0` leaves them out |
 | `PROFILE` | `own` | `own`: the window opens in a browser profile of its own (see below), and links open in your default browser. `shared`: in the browser's usual profile, with its extensions, and links open in that browser. Changing it means logging in again |
-| `DESKTOP_ICON` | `no` | `yes`: also a shortcut on the desktop. It can be added or removed later too, without installing again: `~/.local/share/etesync-aio-web/install.sh --desktop-icon` (or `--no-desktop-icon`) |
+| `DESKTOP_ICON` | `no` | `yes`: also a shortcut on the desktop. It can be added or removed later too, without installing again: `~/.local/share/etesync-desktop/install.sh --desktop-icon` (or `--no-desktop-icon`) |
 
 `get.sh` also has `VERSION` (a given version instead of the latest) and `FORCE=1` (install it even
 when that version is installed already).
@@ -53,11 +53,16 @@ Everything is in your home directory, nothing needs root:
 
 | What | Where |
 |---|---|
-| The app, the server (`serve.py`, on 127.0.0.1 only), the launcher (`etesync-desktop`) and the settings | `~/.local/share/etesync-aio-web/` |
-| The window's browser profile, with `PROFILE=own` (the login and the synced data) | `~/.local/share/etesync-aio-web/profile/` (Firefox: `profile-firefox/`) |
-| The service, with `SERVICE=yes` | `~/.config/systemd/user/etesync-aio-web.service` |
-| The menu entry, which runs the launcher | `~/.local/share/applications/etesync-aio-web.desktop` |
-| The desktop shortcut, with `DESKTOP_ICON=yes` | `~/Desktop/etesync-aio-web.desktop` |
+| The app, the server (`serve.py`, on 127.0.0.1 only), the launcher (`etesync-desktop`) and the settings | `~/.local/share/etesync-desktop/` |
+| The window's browser profile, with `PROFILE=own` (the login and the synced data) | `~/.local/share/etesync-desktop/profile/` (Firefox: `profile-firefox/`) |
+| The service, with `SERVICE=yes` | `~/.config/systemd/user/etesync-desktop.service` |
+| The menu entry, which runs the launcher | `~/.local/share/applications/etesync-desktop.desktop` |
+| The desktop shortcut, with `DESKTOP_ICON=yes` | `~/Desktop/etesync-desktop.desktop` |
+
+Versions before 0.1.11 were installed as `etesync-aio-web` (the folder, the service and the
+shortcuts). Installing 0.1.11 or later moves such an install to the names above, with its settings
+and the window's profile (so the login stays), and removes the old service and shortcuts. Close the
+app's window first: while it's open, the installer stops and asks for that.
 
 The launcher opens the window, and starts the server first when it isn't running (with the service,
 it always is). `etesync-desktop --stop` stops a server it started, `--status` says whether it runs.
@@ -135,7 +140,7 @@ sync what was changed, then log out there to remove them.
 ## Removing it
 
 ```
-~/.local/share/etesync-aio-web/install.sh --uninstall
+~/.local/share/etesync-desktop/install.sh --uninstall
 ```
 
 It removes the service, the server, the app, the window's own profile (with the login and the synced

@@ -29,12 +29,45 @@ export function wrap(edit: Edit, marker: string, placeholder: string): Edit {
     start -= before.length;
     end += after.length;
   }
-  const inner = (start === end) ? placeholder : text.slice(start, end);
-  return {
-    text: text.slice(0, start) + marker + inner + marker + text.slice(end),
-    start: start + len,
-    end: start + len + inner.length,
-  };
+  if (start === end) {
+    return { text: text.slice(0, start) + marker + placeholder + marker + text.slice(start), start: start + len, end: start + len + placeholder.length };
+  }
+  return wrapLines({ text, start, end }, marker, placeholder);
+}
+
+// Markers that Markdown reads: around each line's text on its own (they don't go over lines), after
+// its list, quote or heading marker, and without the spaces at its ends (Markdown doesn't read
+// "~~text ~~"). E.g. a whole line chosen with three clicks, with its line break.
+function wrapLines(edit: Edit, marker: string, placeholder: string): Edit {
+  const { text, start, end } = edit;
+  const len = marker.length;
+  const parts = text.slice(start, end).split("\n").map((line, i) => {
+    const atLineStart = (i > 0) || (start === 0) || (text[start - 1] === "\n");
+    const indent = line.match(/^\s*/)![0];
+    const prefix = (atLineStart) ? indent + (line.slice(indent.length).match(linePrefixes)?.[0] ?? "") : "";
+    const rest = line.slice(prefix.length);
+    const lead = rest.match(/^\s*/)![0];
+    const inner = rest.slice(lead.length).trimEnd();
+    return { before: prefix + lead, inner, after: rest.slice(lead.length + inner.length) };
+  });
+  const filled = parts.filter((x) => x.inner);
+  if (filled.length === 0) {
+    // (only spaces chosen: the markers go where they start, to type between)
+    return wrap({ text, start, end: start }, marker, placeholder);
+  }
+  const wrapped = filled.every((x) => (x.inner.length >= 2 * len) && x.inner.startsWith(marker) && x.inner.endsWith(marker));
+  const changed = parts.map((x) => {
+    const inner = (!x.inner) ? "" : (wrapped) ? x.inner.slice(len, -len) : marker + x.inner + marker;
+    return x.before + inner + x.after;
+  });
+  const result = changed.join("\n");
+  const newText = text.slice(0, start) + result + text.slice(end);
+  if (parts.length === 1) {
+    // Within a line, what's between the markers stays selected
+    const from = start + parts[0].before.length + ((wrapped) ? 0 : len);
+    return { text: newText, start: from, end: from + parts[0].inner.length + ((wrapped) ? -2 * len : 0) };
+  }
+  return { text: newText, start, end: start + result.length };
 }
 
 // The lines the selection is on: where the first starts and the last ends

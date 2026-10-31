@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // The dialogs that open over any page: making a collection (a calendar, a task list, an address book,
-// a notebook or a bookmark list), and importing files (choose, review, done)
+// a notebook or a bookmark list), importing files (choose, review, done), and the keyboard shortcuts
 
 import * as React from "react";
 import { Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
@@ -28,19 +28,21 @@ interface DialogsType {
   // (stay: the screen it's opened from stays, e.g. a new note that waits for a notebook to be in)
   newCollection: (kind?: Kind, options?: { stay?: boolean }) => void;
   importFiles: (colUid?: string) => void;
+  shortcuts: () => void;
 }
 
-const DialogsContext = React.createContext<DialogsType>({ newCollection: () => undefined, importFiles: () => undefined });
+const DialogsContext = React.createContext<DialogsType>({ newCollection: () => undefined, importFiles: () => undefined, shortcuts: () => undefined });
 
 export function useDialogs() {
   return React.useContext(DialogsContext);
 }
 
 export function DialogsProvider(props: React.PropsWithChildren<unknown>) {
-  const [open, setOpen] = React.useState<{ type: "new", kind: Kind, stay?: boolean } | { type: "import", colUid?: string }>();
+  const [open, setOpen] = React.useState<{ type: "new", kind: Kind, stay?: boolean } | { type: "import", colUid?: string } | { type: "shortcuts" }>();
   const value = React.useMemo(() => ({
     newCollection: (kind?: Kind, options?: { stay?: boolean }) => setOpen({ type: "new", kind: kind ?? "calendar", stay: options?.stay }),
     importFiles: (colUid?: string) => setOpen({ type: "import", colUid }),
+    shortcuts: () => setOpen({ type: "shortcuts" }),
   }), []);
   return (
     <DialogsContext.Provider value={value}>
@@ -50,6 +52,9 @@ export function DialogsProvider(props: React.PropsWithChildren<unknown>) {
       )}
       {(open?.type === "import") && (
         <ImportDialog colUid={open.colUid} onClose={() => setOpen(undefined)} />
+      )}
+      {(open?.type === "shortcuts") && (
+        <ShortcutsDialog onClose={() => setOpen(undefined)} />
       )}
     </DialogsContext.Provider>
   );
@@ -64,7 +69,8 @@ function host(etebase: Etebase.Account | null | undefined) {
 }
 
 // A dialog: its title (and steps), what's in it, and a bar with what it does at the bottom
-export function Frame(props: React.PropsWithChildren<{ title: string, steps?: { labels: string[], current: number }, onClose: () => void, footer: React.ReactNode, width: number, testID?: string }>) {
+// (plain: without the note that what's in it is encrypted, for a dialog that saves nothing)
+export function Frame(props: React.PropsWithChildren<{ title: string, steps?: { labels: string[], current: number }, onClose: () => void, footer: React.ReactNode, width: number, testID?: string, plain?: boolean }>) {
   const theme = useTheme();
   const etebase = useCredentials();
   const window = useWindowDimensions();
@@ -112,17 +118,73 @@ export function Frame(props: React.PropsWithChildren<{ title: string, steps?: { 
             {props.children}
           </ScrollView>
           <View style={[styles.foot, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
-            <View style={styles.encrypted}>
-              <MaterialCommunityIcons name="lock-outline" size={13} color={theme.colors.textMuted} />
-              <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
-                Encrypted, saved to <Text style={{ fontFamily: mono, fontSize: 12, color: theme.colors.textMuted }}>{host(etebase)}</Text>
-              </Text>
-            </View>
+            {(props.plain) ? <View style={{ flex: 1 }} /> : (
+              <View style={styles.encrypted}>
+                <MaterialCommunityIcons name="lock-outline" size={13} color={theme.colors.textMuted} />
+                <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
+                  Encrypted, saved to <Text style={{ fontFamily: mono, fontSize: 12, color: theme.colors.textMuted }}>{host(etebase)}</Text>
+                </Text>
+              </View>
+            )}
             {props.footer}
           </View>
         </View>
       </Modal>
     </Portal>
+  );
+}
+
+// The keyboard shortcuts and what can be typed (opened with ? or Ctrl+/, and from the account menu)
+const shortcuts: { title: string, items: [string[], string][] }[] = [
+  { title: "Anywhere", items: [
+    // (the sections in the order of the sidebar)
+    [["Alt", "1"], "Calendar"],
+    [["Alt", "2"], "Tasks"],
+    [["Alt", "3"], "Notes"],
+    [["Alt", "4"], "Bookmarks"],
+    [["Alt", "5"], "Contacts"],
+    [["?"], "This list (when not typing)"],
+    [["Ctrl", "/"], "This list (also while typing)"],
+  ] },
+  { title: "Notes", items: [
+    [["Esc"], "Stop editing the note"],
+    [["Ctrl", "Click"], "Select several notes (Esc selects none)"],
+    [["Right click"], "Move or delete the note, or the selected ones"],
+  ] },
+  { title: "Tasks", items: [
+    [["Enter"], "Add the task typed at the top, or a subtask"],
+    [["!high"], "In a new task's title: high priority"],
+    [["!medium"], "Medium priority"],
+    [["!low"], "Low priority"],
+  ] },
+  { title: "Bookmarks", items: [
+    [["Enter"], "Save the link pasted at the top"],
+  ] },
+];
+
+export function ShortcutsDialog(props: { onClose: () => void }) {
+  const theme = useTheme();
+  return (
+    <Frame title="Keyboard shortcuts" onClose={props.onClose} width={560} testID="shortcuts" plain footer={<Button label="Close" onPress={props.onClose} />}>
+      {shortcuts.map((section) => (
+        <View key={section.title} style={{ gap: 6 }}>
+          <Text style={[styles.shortcutsTitle, { color: theme.colors.textMuted }]}>{section.title}</Text>
+          {section.items.map(([keys, label]) => (
+            <View key={keys.join("+") + label} style={styles.shortcut}>
+              <View style={styles.keys} accessibilityLabel={keys.join(" + ")}>
+                {keys.map((key, i) => (
+                  <React.Fragment key={key}>
+                    {(i > 0) && <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>+</Text>}
+                    <Text style={[styles.key, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.field }]}>{key}</Text>
+                  </React.Fragment>
+                ))}
+              </View>
+              <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textBody }}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
+    </Frame>
   );
 }
 
@@ -765,6 +827,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  shortcutsTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  shortcut: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 28,
+  },
+  keys: {
+    width: 170,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  key: {
+    fontFamily: mono,
+    fontSize: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderRadius: 5,
   },
   encrypted: {
     flex: 1,

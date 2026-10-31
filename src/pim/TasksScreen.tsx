@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import * as React from "react";
-import { ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
+import { Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { IconButton, Snackbar, Text, TouchableRipple } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useDispatch, useSelector } from "react-redux";
@@ -517,6 +517,12 @@ export default function TasksScreen() {
             </View>
             <Text style={[hint, { paddingLeft: 4 }]}>
               Set the priority as you type: <Text style={code}>!high</Text> <Text style={code}>!medium</Text> <Text style={code}>!low</Text>
+              {(Platform.OS === "web") && (
+                <>
+                  {" · "}
+                  <Text accessibilityRole="link" onPress={() => dialogs.shortcuts()} style={{ color: theme.colors.accentText }}>Keyboard shortcuts</Text>
+                </>
+              )}
             </Text>
           </View>
           <View style={{ gap: 8 }}>

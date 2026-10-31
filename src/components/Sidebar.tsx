@@ -144,6 +144,7 @@ function Account() {
   const [showFingerprint, setShowFingerprint] = React.useState(false);
   const [showLogout, setShowLogout] = React.useState(false);
   const username = etebase.user.username;
+  const dialogs = useDialogs();
 
   return (
     <>
@@ -178,6 +179,10 @@ function Account() {
         <MenuItem icon="email-outline" title="Invitations" onPress={() => {
           setShowMenu(false);
           navigate("Invitations");
+        }} />
+        <MenuItem icon="keyboard-outline" title="Keyboard shortcuts" onPress={() => {
+          setShowMenu(false);
+          dialogs.shortcuts();
         }} />
         <MenuItem icon="fingerprint" title="Show Fingerprint" onPress={() => {
           setShowMenu(false);
@@ -544,6 +549,12 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
 
 // The first column on wide screens: the account, the search (of everything) and making new things,
 // the four sections, a list about the section that is open, and the settings and the sync
+// Whether a key goes to something that's typed in (where ? is only a question mark)
+function isTyping(target: EventTarget | null) {
+  const el = target as HTMLElement | null;
+  return !!el && ((el.tagName === "INPUT") || (el.tagName === "TEXTAREA") || (el.tagName === "SELECT") || el.isContentEditable);
+}
+
 export default function Sidebar() {
   const theme = useTheme();
   const dispatch = useDispatch();
@@ -555,6 +566,7 @@ export default function Sidebar() {
   const savedWidth = useSelector((state: StoreState) => state.settings.sidebarWidth);
   const resize = useResize(savedWidth, (sidebarWidth) => dispatch(setSettings({ sidebarWidth }) as any));
   const pendingCount = usePendingCount();
+  const dialogs = useDialogs();
   const isSyncing = useSelector((state: StoreState) => state.syncCount) > 0;
   const section = sectionOf(currentScreen);
   const onPimScreen = section !== "notes";
@@ -598,9 +610,11 @@ export default function Sidebar() {
   }
 
   // Alt+1 to Alt+5 go to the sections, in their order (by the key's place, which the keyboard's
-  // layout doesn't change)
+  // layout doesn't change). ? (when not typing) and Ctrl+/ show the shortcuts.
   const goToRef = React.useRef(goTo);
   goToRef.current = goTo;
+  const dialogsRef = React.useRef(dialogs);
+  dialogsRef.current = dialogs;
   const screens = sections.map((x) => x.screen).join(" ");
   React.useEffect(() => {
     if (Platform.OS !== "web") {
@@ -612,6 +626,10 @@ export default function Sidebar() {
       if (screen && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
         goToRef.current(screen);
+      } else if (((e.key === "?") && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target)) ||
+        (((e.key === "/") || (e.code === "Slash")) && (e.ctrlKey || e.metaKey) && !e.altKey)) {
+        e.preventDefault();
+        dialogsRef.current.shortcuts();
       }
     };
     // (before the fields get it, which keep it to themselves)

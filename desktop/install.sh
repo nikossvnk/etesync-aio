@@ -68,8 +68,8 @@ remove_service() {
 # is open, as its browser keeps writing to the profile where it was.
 move_old_install() {
     { [ -d "$OLD_BASE" ] && [ ! -e "$BASE" ]; } || return 0
-    # (the window's browser is started with the profile's path)
-    if pgrep -f -- "$OLD_BASE/profile" >/dev/null 2>&1; then
+    # (the window's browser is started with the profile's path: Chromium's --user-data-dir, Firefox's --profile)
+    if pgrep -f -- "(--user-data-dir=|--profile )$OLD_BASE/profile" >/dev/null 2>&1; then
         echo "Close the EteSync Desktop window first (its browser profile is moved to $BASE), then run this again" >&2
         exit 1
     fi

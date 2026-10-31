@@ -1,4 +1,4 @@
-// Deleting a calendar's old events from its ⋯ menu in the sidebar: the ones that happened once and
+// Deleting a calendar's old events from its ⋯ menu (in Settings → Collections, and in the sidebar): the ones that happened once and
 // ended more than a year ago are deleted on the server, after asking; repeating ones (even if they
 // ended long ago) and newer ones stay. It uses an account of its own.
 const { launch, session, run, check, unique, newAccount, waitFor, collectionOf, Etebase } = require("../lib");
@@ -40,8 +40,11 @@ run(async () => {
   await p.reload(); await wait(5000);
   await p.keyboard.press("Alt+1"); await wait(3000);
 
+  // From the ⋯ of the calendar in Settings → Collections
   const sidebar = p.locator('[data-testid="sidebar"] >> visible=true');
-  await sidebar.getByRole("button", { name: "My Calendar options" }).click({ force: true }); await wait(600);
+  await sidebar.getByRole("link", { name: "Manage calendars" }).click(); await wait(2000);
+  const calendars = p.locator('[data-testid="collections-calendar"] >> visible=true');
+  await calendars.getByRole("button", { name: "My Calendar options" }).click(); await wait(600);
   await p.getByRole("menuitem", { name: "Delete old events…" }).click(); await wait(800);
   check("it asks first, saying how many and that repeating events are kept",
     await A.has("Delete the 2 events of My Calendar that ended more than a year ago?") && await A.has("repeating events are kept"), await A.text());
@@ -53,7 +56,8 @@ run(async () => {
   }), await titles(etebase));
   check("and it says so", await A.has("2 old events of My Calendar deleted"), await A.text());
 
-  // Again: nothing left to delete
+  // Again, from the ⋯ of the calendar in the sidebar: nothing left to delete
+  await p.keyboard.press("Alt+1"); await wait(2000);
   await sidebar.getByRole("button", { name: "My Calendar options" }).click({ force: true }); await wait(600);
   await p.getByRole("menuitem", { name: "Delete old events…" }).click(); await wait(800);
   check("then there's nothing old left", await A.has("My Calendar has no events that ended more than a year ago."), await A.text());

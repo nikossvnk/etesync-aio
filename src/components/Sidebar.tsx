@@ -9,21 +9,20 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useDispatch, useSelector } from "react-redux";
 
 import { StoreState } from "../store";
-import { pushMessage, setSettings } from "../store/actions";
+import { setSettings } from "../store/actions";
 import { serverName } from "../helpers";
 import { cardShadow, fonts, useTheme } from "../theme";
 import { usePendingCount } from "../SyncGate";
 import { useCredentials } from "../credentials";
 import { externalMenuItems, FingerprintDialog } from "../Drawer";
 import LogoutDialog from "./LogoutDialog";
-import ConfirmationDialog from "../widgets/ConfirmationDialog";
 import Menu from "../widgets/Menu";
 import MenuItem from "../widgets/MenuItem";
 import { useSearchQuery, useWideNavigation } from "./WideLayout";
 import * as C from "../constants";
-import { deletePimItems, PimCollection, usePimCollections, usePimItems } from "../pim/data";
-import { ContactType, EventType, TaskType } from "../pim/pim-types";
-import { addDays, birthdaysColor, birthdaysUid, contactBirthday, oneTimeEventsBefore, startOfDay, useOccurrences } from "../pim/occurrences";
+import { usePimCollections, usePimItems } from "../pim/data";
+import { ContactType, TaskType } from "../pim/pim-types";
+import { addDays, birthdaysColor, birthdaysUid, contactBirthday, startOfDay, useOccurrences } from "../pim/occurrences";
 import { CollectionInfo, Kind, kinds, useCollectionInfos } from "../pim/collections";
 import { CollectionMenu } from "../pim/CollectionsScreen";
 import { useDialogs } from "../pim/Dialogs";
@@ -265,41 +264,6 @@ function CreateButton() {
 // lists, the calendars (to hide and show them), the task lists, or the address books and groups of contacts
 // (inSection: the page is of the section, rather than e.g. the settings opened from it, where none
 // of the list is the chosen one)
-// Deleting a calendar's events that ended more than a year ago, after asking (only the ones that
-// don't repeat)
-function DeleteOldEvents(props: { calendar: PimCollection, onClose: () => void }) {
-  const dispatch = useDispatch();
-  const etebase = useCredentials()!;
-  const events = usePimItems(etebase, C.calendarType, EventType.parse);
-  const yearAgo = new Date();
-  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-  const old = oneTimeEventsBefore((events ?? []).filter((x) => x.collectionUid === props.calendar.colUid), yearAgo);
-  const name = props.calendar.name;
-
-  async function remove() {
-    await deletePimItems(etebase, old);
-    props.onClose();
-    dispatch(pushMessage({ message: `${old.length} old ${(old.length === 1) ? "event" : "events"} of ${name} deleted`, severity: "success" }) as any);
-  }
-
-  return (
-    <ConfirmationDialog
-      title="Delete old events"
-      visible
-      labelOk={(old.length) ? "Delete" : "OK"}
-      onOk={(old.length) ? remove : props.onClose}
-      onCancel={props.onClose}
-    >
-      <Text>
-        {(!events) ? "Loading…" : (old.length) ?
-          `Delete the ${(old.length === 1) ? "event" : `${old.length} events`} of ${name} that ended more than a year ago? This can't be undone.` :
-          `${name} has no events that ended more than a year ago.`}
-        {" "}Only events that happen once are deleted: repeating events are kept, even old ones.
-      </Text>
-    </ConfirmationDialog>
-  );
-}
-
 function SectionList(props: { section: Section, inSection: boolean, onPimScreen: boolean }) {
   const theme = useTheme();
   const dispatch = useDispatch();
@@ -322,8 +286,6 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
   const dialogs = useDialogs();
   const infos = useCollectionInfos(etebase);
   const infoOf = (colUid: string) => infos.find((x) => x.colUid === colUid);
-  // The calendar whose old events are being deleted
-  const [cleaning, setCleaning] = React.useState<PimCollection>();
 
   const header = (title: string, addLabel: string, onAdd: () => void) => (
     <View style={styles.sectionHeader}>
@@ -376,21 +338,12 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
         {header("Calendars", "New calendar", () => dialogs.newCollection("calendar"))}
         {rows.map((x) => {
           const shown = !hidden.includes(x.colUid);
-          // (the ⋯ menu can also show only this one, and delete its old events)
-          const calendar = calendars.find((c) => c.colUid === x.colUid);
+          // (the ⋯ menu can also show only this one)
           const onlyThis = (close: () => void) => (
-            <>
-              <MenuItem icon="eye-outline" title="Show only this one" onPress={() => {
-                close();
-                dispatch(setSettings({ hiddenCalendars: [...calendars.map((c) => c.colUid), birthdaysUid].filter((c) => c !== x.colUid) }) as any);
-              }} />
-              {calendar && (
-                <MenuItem icon="delete-clock-outline" title="Delete old events…" onPress={() => {
-                  close();
-                  setCleaning(calendar);
-                }} />
-              )}
-            </>
+            <MenuItem icon="eye-outline" title="Show only this one" onPress={() => {
+              close();
+              dispatch(setSettings({ hiddenCalendars: [...calendars.map((c) => c.colUid), birthdaysUid].filter((c) => c !== x.colUid) }) as any);
+            }} />
           );
           return (
             <WithMenu key={x.colUid} info={infoOf(x.colUid)} extra={onlyThis}>
@@ -412,7 +365,6 @@ function SectionList(props: { section: Section, inSection: boolean, onPimScreen:
           );
         })}
         {manage("calendar")}
-        {cleaning && <DeleteOldEvents calendar={cleaning} onClose={() => setCleaning(undefined)} />}
       </>
     );
   }
